@@ -1,0 +1,152 @@
+import { useCallback, useEffect, useState } from 'react'
+import { supabase } from '../lib/supabase'
+import type {
+  BoardLink,
+  BoardNote,
+  Car,
+  CarCargoItem,
+  CarExpense,
+  CarPassenger,
+  GeneralExpense,
+  GeneralExpenseParticipant,
+  Member,
+  RadarPosition,
+  Room,
+} from '../types'
+
+interface RoomData {
+  loading: boolean
+  room: Room | null
+  members: Member[]
+  cars: Car[]
+  carPassengers: CarPassenger[]
+  carExpenses: CarExpense[]
+  carCargo: CarCargoItem[]
+  generalExpenses: GeneralExpense[]
+  generalExpenseParticipants: GeneralExpenseParticipant[]
+  boardNotes: BoardNote[]
+  boardLinks: BoardLink[]
+  radarPositions: RadarPosition[]
+}
+
+const EMPTY: RoomData = {
+  loading: true,
+  room: null,
+  members: [],
+  cars: [],
+  carPassengers: [],
+  carExpenses: [],
+  carCargo: [],
+  generalExpenses: [],
+  generalExpenseParticipants: [],
+  boardNotes: [],
+  boardLinks: [],
+  radarPositions: [],
+}
+
+export function useRoomData(roomId: string | undefined) {
+  const [data, setData] = useState<RoomData>(EMPTY)
+
+  const loadAll = useCallback(async (id: string) => {
+    const [
+      roomRes,
+      membersRes,
+      carsRes,
+      carPassengersRes,
+      carExpensesRes,
+      carCargoRes,
+      generalExpensesRes,
+      generalExpenseParticipantsRes,
+      boardNotesRes,
+      boardLinksRes,
+      radarRes,
+    ] = await Promise.all([
+      supabase.from('rooms').select('*').eq('id', id).maybeSingle(),
+      supabase.from('members').select('*').eq('room_id', id),
+      supabase.from('cars').select('*').eq('room_id', id),
+      supabase.from('car_passengers').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      supabase.from('car_expenses').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      supabase.from('car_cargo').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      supabase.from('general_expenses').select('*').eq('room_id', id),
+      supabase
+        .from('general_expense_participants')
+        .select('*, general_expenses!inner(room_id)')
+        .eq('general_expenses.room_id', id),
+      supabase.from('board_notes').select('*').eq('room_id', id),
+      supabase.from('board_links').select('*').eq('room_id', id),
+      supabase.from('radar_positions').select('*').eq('room_id', id),
+    ])
+
+    setData({
+      loading: false,
+      room: roomRes.data ?? null,
+      members: membersRes.data ?? [],
+      cars: carsRes.data ?? [],
+      carPassengers: carPassengersRes.data ?? [],
+      carExpenses: carExpensesRes.data ?? [],
+      carCargo: carCargoRes.data ?? [],
+      generalExpenses: generalExpensesRes.data ?? [],
+      generalExpenseParticipants: generalExpenseParticipantsRes.data ?? [],
+      boardNotes: boardNotesRes.data ?? [],
+      boardLinks: boardLinksRes.data ?? [],
+      radarPositions: radarRes.data ?? [],
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!roomId) return
+    loadAll(roomId)
+  }, [roomId, loadAll])
+
+  useEffect(() => {
+    if (!roomId) return
+
+    // Alcune tabelle (car_expenses, car_cargo, car_passengers, general_expense_participants)
+    // non hanno room_id diretto: alla scala di un gruppo di amici è più semplice ricaricare
+    // tutto ad ogni evento che filtrare lato client per car_id/expense_id di questa stanza.
+    const channel = supabase
+      .channel(`room-data:${roomId}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, () =>
+        loadAll(roomId),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `room_id=eq.${roomId}` }, () =>
+        loadAll(roomId),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'cars', filter: `room_id=eq.${roomId}` }, () =>
+        loadAll(roomId),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'car_passengers' }, () => loadAll(roomId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'car_expenses' }, () => loadAll(roomId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'car_cargo' }, () => loadAll(roomId))
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'general_expenses', filter: `room_id=eq.${roomId}` },
+        () => loadAll(roomId),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'general_expense_participants' }, () =>
+        loadAll(roomId),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'board_notes', filter: `room_id=eq.${roomId}` },
+        () => loadAll(roomId),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'board_links', filter: `room_id=eq.${roomId}` },
+        () => loadAll(roomId),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'radar_positions', filter: `room_id=eq.${roomId}` },
+        () => loadAll(roomId),
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [roomId, loadAll])
+
+  return { ...data, reload: () => roomId && loadAll(roomId) }
+}

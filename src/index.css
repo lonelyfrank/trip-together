@@ -5,16 +5,17 @@
   --font-serif: 'Fraunces', ui-serif, Georgia, serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
 
-  --color-ink: #0e1f1a;
-  --color-ink-deep: #0b1815;
-  --color-surface: #16302a;
-  --color-border-soft: #22403a;
-  --color-border-strong: #26443b;
-  --color-border-dashed: #3a5952;
-  --color-highlight-from: #1c3a32;
-  --color-highlight-to: #152c26;
-  --color-cream: #f2ecdd;
-  --color-muted: #7fa096;
+  /* Palette "obsidian" */
+  --color-ink: #0a0a0f;
+  --color-ink-deep: #111118;
+  --color-surface: #1a1a25;
+  --color-border-soft: rgba(100, 100, 180, 0.1);
+  --color-border-strong: rgba(100, 100, 180, 0.2);
+  --color-border-dashed: #4a4a6a;
+  --color-highlight-from: #1a1a25;
+  --color-highlight-to: #111118;
+  --color-cream: #c9c9e0;
+  --color-muted: #7878a0;
   --color-amber: #e8a33d;
   --color-teal: #46d9c9;
   --color-coral: #e76f51;
@@ -29,4 +30,24 @@ body {
   min-height: 100svh;
   background: var(--color-ink);
   color: var(--color-cream);
+}
+
+@keyframes radar-sweep {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-ping {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
 }
