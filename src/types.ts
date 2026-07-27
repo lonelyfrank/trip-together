@@ -130,6 +130,17 @@ export interface StopProposalVote {
   voted_at: string
 }
 
+export type RideRequestStatus = 'pending' | 'matched' | 'cancelled'
+
+export interface RideRequest {
+  id: string
+  room_id: string
+  member_id: string
+  status: RideRequestStatus
+  created_at: string
+  matched_car_id: string | null
+}
+
 export type ChecklistItemStatus = 'da_portare' | 'portato'
 
 export interface RoomChecklistItem {

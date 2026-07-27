@@ -8,6 +8,7 @@ create extension if not exists pgcrypto;
 -- ─── drop (ordine inverso alle dipendenze) ─────────────────────────────
 drop table if exists radar_positions cascade;
 drop table if exists room_checklist_items cascade;
+drop table if exists ride_requests cascade;
 drop table if exists stop_proposal_votes cascade;
 drop table if exists stop_proposals cascade;
 drop table if exists board_links cascade;
@@ -111,6 +112,16 @@ create table stop_proposal_votes (
   primary key (proposal_id, member_id)
 );
 
+-- ─── matching passeggeri-auto ──────────────────────────────────────────
+create table ride_requests (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid references rooms(id) on delete cascade,
+  member_id uuid not null references members(id),
+  status text not null default 'pending' check (status in ('pending', 'matched', 'cancelled')),
+  created_at timestamptz not null default now(),
+  matched_car_id uuid references cars(id)
+);
+
 -- ─── spese generali (scope: tutta la stanza o un sottoinsieme) ─────────
 create table general_expenses (
   id uuid primary key default gen_random_uuid(),
@@ -173,6 +184,7 @@ create index idx_car_cargo_car on car_cargo(car_id);
 create index idx_delay_reports_car on delay_reports(car_id);
 create index idx_stop_proposals_room on stop_proposals(room_id);
 create index idx_stop_proposal_votes_proposal on stop_proposal_votes(proposal_id);
+create index idx_ride_requests_room on ride_requests(room_id);
 create index idx_general_expenses_room on general_expenses(room_id);
 create index idx_general_expense_participants_expense on general_expense_participants(expense_id);
 create index idx_board_notes_room on board_notes(room_id);
@@ -200,6 +212,7 @@ alter table radar_positions enable row level security;
 alter table room_checklist_items enable row level security;
 alter table stop_proposals enable row level security;
 alter table stop_proposal_votes enable row level security;
+alter table ride_requests enable row level security;
 
 create policy "rooms: all" on rooms for all using (true) with check (true);
 create policy "members: all" on members for all using (true) with check (true);
@@ -270,6 +283,14 @@ with check (
   )
 );
 
+create policy "ride_requests: scoped to room members" on ride_requests for all
+using (
+  exists (select 1 from members m where m.room_id = ride_requests.room_id and m.auth_user_id = auth.uid())
+)
+with check (
+  exists (select 1 from members m where m.room_id = ride_requests.room_id and m.auth_user_id = auth.uid())
+);
+
 -- ─── Realtime ───────────────────────────────────────────────────────────
 alter publication supabase_realtime add table rooms;
 alter publication supabase_realtime add table members;
@@ -286,3 +307,4 @@ alter publication supabase_realtime add table radar_positions;
 alter publication supabase_realtime add table room_checklist_items;
 alter publication supabase_realtime add table stop_proposals;
 alter publication supabase_realtime add table stop_proposal_votes;
+alter publication supabase_realtime add table ride_requests;

@@ -11,10 +11,12 @@ import type {
   CarPassenger,
   DelayReport,
   Member,
+  RideRequest,
   StopProposal,
   StopProposalVote,
 } from '../../types'
 import DelayReportBadge from './DelayReportBadge'
+import RideRequestsSection from './RideRequestsSection'
 import StopProposalsSection from './StopProposalsSection'
 import TravelStatusChip from './TravelStatusChip'
 
@@ -29,6 +31,7 @@ interface AutoTabProps {
   delayReports: DelayReport[]
   stopProposals: StopProposal[]
   stopProposalVotes: StopProposalVote[]
+  rideRequests: RideRequest[]
 }
 
 export default function AutoTab({
@@ -42,6 +45,7 @@ export default function AutoTab({
   delayReports,
   stopProposals,
   stopProposalVotes,
+  rideRequests,
 }: AutoTabProps) {
   const [addingCar, setAddingCar] = useState(false)
   const [seats, setSeats] = useState('4')
@@ -231,10 +235,22 @@ export default function AutoTab({
         <p className="text-center text-sm text-muted">Nessuna auto dichiarata ancora.</p>
       )}
 
+      <RideRequestsSection
+        roomId={roomId}
+        currentMember={currentMember}
+        members={members}
+        cars={cars}
+        carPassengers={carPassengers}
+        rideRequests={rideRequests}
+        amUnassigned={!assignedIds.has(currentMember.id)}
+      />
+
       {unassigned.length > 0 && (
         <div className="space-y-2">
           <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Senza auto</p>
-          {unassigned.map((m) => (
+          {unassigned
+            .filter((m) => !rideRequests.some((r) => r.member_id === m.id && r.status === 'pending'))
+            .map((m) => (
             <Card key={m.id} tone="dashed" className="flex items-center justify-between !p-3.5">
               <p className="text-[13.5px] text-cream">{m.display_name}</p>
               {cars.length > 0 && (
