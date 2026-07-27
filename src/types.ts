@@ -8,6 +8,7 @@ export interface Room {
   destination_label: string | null
   destination_lat: number | null
   destination_lng: number | null
+  event_time: string | null
   status: RoomStatus
   created_by: string
   created_at: string
@@ -19,6 +20,8 @@ export interface Member {
   display_name: string
   auth_user_id: string | null
   role: MemberRole
+  confirmed: boolean
+  confirmed_at: string | null
   created_at: string
 }
 

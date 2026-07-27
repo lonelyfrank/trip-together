@@ -14,6 +14,7 @@ import type {
 } from '../../types'
 import MapSheet from '../MapSheet'
 import CloseRoomSection from './CloseRoomSection'
+import ReadinessBanner from './ReadinessBanner'
 
 interface StanzaTabProps {
   room: Room
@@ -25,6 +26,7 @@ interface StanzaTabProps {
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
   onGoToSpese: () => void
+  onGoToAuto: () => void
   onClosed: () => void
 }
 
@@ -44,6 +46,7 @@ export default function StanzaTab({
   generalExpenses,
   generalExpenseParticipants,
   onGoToSpese,
+  onGoToAuto,
   onClosed,
 }: StanzaTabProps) {
   const [mapOpen, setMapOpen] = useState(false)
@@ -51,6 +54,7 @@ export default function StanzaTab({
   const [label, setLabel] = useState(room.destination_label ?? '')
   const [lat, setLat] = useState(room.destination_lat?.toString() ?? '')
   const [lng, setLng] = useState(room.destination_lng?.toString() ?? '')
+  const [eventTime, setEventTime] = useState(room.event_time?.slice(0, 16) ?? '')
   const [saving, setSaving] = useState(false)
   const [copied, setCopied] = useState(false)
 
@@ -66,6 +70,7 @@ export default function StanzaTab({
           destination_label: label.trim() || null,
           destination_lat: lat.trim() ? Number(lat) : null,
           destination_lng: lng.trim() ? Number(lng) : null,
+          event_time: eventTime ? new Date(eventTime).toISOString() : null,
         })
         .eq('id', room.id)
       setEditing(false)
@@ -82,6 +87,15 @@ export default function StanzaTab({
 
   return (
     <div className="space-y-3 px-4 pb-28 sm:px-6">
+      <ReadinessBanner
+        room={room}
+        currentMember={currentMember}
+        members={members}
+        cars={cars}
+        carPassengers={carPassengers}
+        onGoToAuto={onGoToAuto}
+      />
+
       <Card tone="highlight">
         <div className="mb-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-amber">
@@ -120,6 +134,12 @@ export default function StanzaTab({
                 onChange={(e) => setLng(e.target.value)}
               />
             </div>
+            <input
+              type="datetime-local"
+              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
+              value={eventTime}
+              onChange={(e) => setEventTime(e.target.value)}
+            />
             <div className="flex gap-2">
               <Button type="submit" variant="teal" size="sm" disabled={saving}>
                 Salva
@@ -134,6 +154,17 @@ export default function StanzaTab({
             <p className="font-serif text-[19px] leading-snug text-cream">
               {room.destination_label || 'Destinazione senza nome'}
             </p>
+            {room.event_time && (
+              <p className="mt-0.5 font-mono text-[11px] text-muted">
+                {new Date(room.event_time).toLocaleString('it-IT', {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'long',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                })}
+              </p>
+            )}
             {hasCoords && (
               <Button className="mt-3 w-full" onClick={() => setMapOpen(true)}>
                 <Navigation size={14} /> Avvia percorso

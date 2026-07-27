@@ -103,6 +103,7 @@ export default function RoomPage() {
             generalExpenses={generalExpenses}
             generalExpenseParticipants={generalExpenseParticipants}
             onGoToSpese={() => setTab('spese')}
+            onGoToAuto={() => setTab('auto')}
             onClosed={() => navigate('/')}
           />
         ) : (

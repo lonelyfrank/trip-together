@@ -31,6 +31,7 @@ create table rooms (
   destination_label text,
   destination_lat float8,
   destination_lng float8,
+  event_time timestamptz, -- usato dal countdown readiness T-24h/T-2h
   status text not null default 'open', -- 'open' | 'closed'
   created_by uuid not null,
   created_at timestamptz default now()
@@ -43,6 +44,8 @@ create table members (
   display_name text not null,
   auth_user_id uuid,
   role text not null default 'guest', -- 'creator' | 'guest'
+  confirmed boolean not null default false,
+  confirmed_at timestamptz,
   created_at timestamptz default now()
 );
 
