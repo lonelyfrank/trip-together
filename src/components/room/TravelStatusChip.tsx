@@ -35,6 +35,15 @@ export default function TravelStatusChip({ car, currentMemberId, canEdit }: Trav
         travel_status_updated_by: currentMemberId,
       })
       .eq('id', car.id)
+
+    if (status === 'arrivata') {
+      await supabase
+        .from('delay_reports')
+        .update({ resolved_at: new Date().toISOString() })
+        .eq('car_id', car.id)
+        .is('resolved_at', null)
+    }
+
     setOpen(false)
   }
 

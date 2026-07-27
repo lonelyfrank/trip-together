@@ -11,6 +11,7 @@ drop table if exists board_links cascade;
 drop table if exists board_notes cascade;
 drop table if exists general_expense_participants cascade;
 drop table if exists general_expenses cascade;
+drop table if exists delay_reports cascade;
 drop table if exists car_cargo cascade;
 drop table if exists car_expenses cascade;
 drop table if exists car_passengers cascade;
@@ -76,6 +77,16 @@ create table car_cargo (
   packed boolean default false
 );
 
+create table delay_reports (
+  id uuid primary key default gen_random_uuid(),
+  car_id uuid not null references cars(id) on delete cascade,
+  reason text not null check (reason in ('traffico', 'benzina', 'dimenticanza', 'altro')),
+  minutes_estimate int,
+  reported_by uuid not null references members(id),
+  created_at timestamptz not null default now(),
+  resolved_at timestamptz
+);
+
 -- ─── spese generali (scope: tutta la stanza o un sottoinsieme) ─────────
 create table general_expenses (
   id uuid primary key default gen_random_uuid(),
@@ -124,6 +135,7 @@ create index idx_cars_room on cars(room_id);
 create index idx_car_passengers_car on car_passengers(car_id);
 create index idx_car_expenses_car on car_expenses(car_id);
 create index idx_car_cargo_car on car_cargo(car_id);
+create index idx_delay_reports_car on delay_reports(car_id);
 create index idx_general_expenses_room on general_expenses(room_id);
 create index idx_general_expense_participants_expense on general_expense_participants(expense_id);
 create index idx_board_notes_room on board_notes(room_id);
@@ -141,6 +153,7 @@ alter table cars enable row level security;
 alter table car_passengers enable row level security;
 alter table car_expenses enable row level security;
 alter table car_cargo enable row level security;
+alter table delay_reports enable row level security;
 alter table general_expenses enable row level security;
 alter table general_expense_participants enable row level security;
 alter table board_notes enable row level security;
@@ -153,6 +166,24 @@ create policy "cars: all" on cars for all using (true) with check (true);
 create policy "car_passengers: all" on car_passengers for all using (true) with check (true);
 create policy "car_expenses: all" on car_expenses for all using (true) with check (true);
 create policy "car_cargo: all" on car_cargo for all using (true) with check (true);
+
+-- delay_reports non ha room_id diretto: scoped ai membri della stanza via join su cars.
+create policy "delay_reports: scoped to room members" on delay_reports for all
+using (
+  exists (
+    select 1 from cars c
+    join members m on m.room_id = c.room_id
+    where c.id = delay_reports.car_id and m.auth_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from cars c
+    join members m on m.room_id = c.room_id
+    where c.id = delay_reports.car_id and m.auth_user_id = auth.uid()
+  )
+);
+
 create policy "general_expenses: all" on general_expenses for all using (true) with check (true);
 create policy "general_expense_participants: all" on general_expense_participants for all using (true) with check (true);
 create policy "board_notes: all" on board_notes for all using (true) with check (true);
@@ -166,6 +197,7 @@ alter publication supabase_realtime add table cars;
 alter publication supabase_realtime add table car_passengers;
 alter publication supabase_realtime add table car_expenses;
 alter publication supabase_realtime add table car_cargo;
+alter publication supabase_realtime add table delay_reports;
 alter publication supabase_realtime add table general_expenses;
 alter publication supabase_realtime add table general_expense_participants;
 alter publication supabase_realtime add table board_notes;

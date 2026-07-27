@@ -41,6 +41,18 @@ export interface CarPassenger {
   member_id: string
 }
 
+export type DelayReason = 'traffico' | 'benzina' | 'dimenticanza' | 'altro'
+
+export interface DelayReport {
+  id: string
+  car_id: string
+  reason: DelayReason
+  minutes_estimate: number | null
+  reported_by: string
+  created_at: string
+  resolved_at: string | null
+}
+
 export interface CarExpense {
   id: string
   car_id: string

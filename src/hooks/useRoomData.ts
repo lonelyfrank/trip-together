@@ -7,6 +7,7 @@ import type {
   CarCargoItem,
   CarExpense,
   CarPassenger,
+  DelayReport,
   GeneralExpense,
   GeneralExpenseParticipant,
   Member,
@@ -22,6 +23,7 @@ interface RoomData {
   carPassengers: CarPassenger[]
   carExpenses: CarExpense[]
   carCargo: CarCargoItem[]
+  delayReports: DelayReport[]
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
   boardNotes: BoardNote[]
@@ -37,6 +39,7 @@ const EMPTY: RoomData = {
   carPassengers: [],
   carExpenses: [],
   carCargo: [],
+  delayReports: [],
   generalExpenses: [],
   generalExpenseParticipants: [],
   boardNotes: [],
@@ -55,6 +58,7 @@ export function useRoomData(roomId: string | undefined) {
       carPassengersRes,
       carExpensesRes,
       carCargoRes,
+      delayReportsRes,
       generalExpensesRes,
       generalExpenseParticipantsRes,
       boardNotesRes,
@@ -67,6 +71,7 @@ export function useRoomData(roomId: string | undefined) {
       supabase.from('car_passengers').select('*, cars!inner(room_id)').eq('cars.room_id', id),
       supabase.from('car_expenses').select('*, cars!inner(room_id)').eq('cars.room_id', id),
       supabase.from('car_cargo').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      supabase.from('delay_reports').select('*, cars!inner(room_id)').eq('cars.room_id', id),
       supabase.from('general_expenses').select('*').eq('room_id', id),
       supabase
         .from('general_expense_participants')
@@ -85,6 +90,7 @@ export function useRoomData(roomId: string | undefined) {
       carPassengers: carPassengersRes.data ?? [],
       carExpenses: carExpensesRes.data ?? [],
       carCargo: carCargoRes.data ?? [],
+      delayReports: delayReportsRes.data ?? [],
       generalExpenses: generalExpensesRes.data ?? [],
       generalExpenseParticipants: generalExpenseParticipantsRes.data ?? [],
       boardNotes: boardNotesRes.data ?? [],
@@ -118,6 +124,7 @@ export function useRoomData(roomId: string | undefined) {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'car_passengers' }, () => loadAll(roomId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'car_expenses' }, () => loadAll(roomId))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'car_cargo' }, () => loadAll(roomId))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'delay_reports' }, () => loadAll(roomId))
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'general_expenses', filter: `room_id=eq.${roomId}` },

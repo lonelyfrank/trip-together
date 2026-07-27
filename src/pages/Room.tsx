@@ -46,6 +46,7 @@ export default function RoomPage() {
     carPassengers,
     carExpenses,
     carCargo,
+    delayReports,
     boardNotes,
     boardLinks,
     generalExpenses,
@@ -113,6 +114,7 @@ export default function RoomPage() {
             carPassengers={carPassengers}
             carExpenses={carExpenses}
             carCargo={carCargo}
+            delayReports={delayReports}
           />
         ) : (
           <div className="px-4 py-8 text-center text-sm text-muted sm:px-6">Membro non trovato.</div>

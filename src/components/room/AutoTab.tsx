@@ -4,7 +4,8 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { supabase } from '../../lib/supabase'
-import type { Car, CarCargoItem, CarExpense, CarPassenger, Member } from '../../types'
+import type { Car, CarCargoItem, CarExpense, CarPassenger, DelayReport, Member } from '../../types'
+import DelayReportBadge from './DelayReportBadge'
 import TravelStatusChip from './TravelStatusChip'
 
 interface AutoTabProps {
@@ -15,6 +16,7 @@ interface AutoTabProps {
   carPassengers: CarPassenger[]
   carExpenses: CarExpense[]
   carCargo: CarCargoItem[]
+  delayReports: DelayReport[]
 }
 
 export default function AutoTab({
@@ -25,6 +27,7 @@ export default function AutoTab({
   carPassengers,
   carExpenses,
   carCargo,
+  delayReports,
 }: AutoTabProps) {
   const [addingCar, setAddingCar] = useState(false)
   const [seats, setSeats] = useState('4')
@@ -142,6 +145,15 @@ export default function AutoTab({
                   posto libero
                 </span>
               ))}
+            </div>
+
+            <div className="mb-3">
+              <DelayReportBadge
+                carId={car.id}
+                currentMemberId={currentMember.id}
+                canReport={(iAmThisDriver || iAmInThisCar) && car.travel_status === 'in_viaggio'}
+                activeDelay={delayReports.find((d) => d.car_id === car.id && !d.resolved_at)}
+              />
             </div>
 
             {!iAmThisDriver && !iAmInThisCar && freeSeats > 0 && (
