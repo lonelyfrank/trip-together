@@ -8,6 +8,8 @@ create extension if not exists pgcrypto;
 -- ─── drop (ordine inverso alle dipendenze) ─────────────────────────────
 drop table if exists radar_positions cascade;
 drop table if exists room_checklist_items cascade;
+drop table if exists stop_proposal_votes cascade;
+drop table if exists stop_proposals cascade;
 drop table if exists board_links cascade;
 drop table if exists board_notes cascade;
 drop table if exists general_expense_participants cascade;
@@ -88,6 +90,27 @@ create table delay_reports (
   resolved_at timestamptz
 );
 
+-- ─── tappa proposta: sosta condivisa, votabile, per auto o per tutti ───
+create table stop_proposals (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid references rooms(id) on delete cascade,
+  car_id uuid references cars(id) on delete cascade, -- null = proposta per tutta la comitiva
+  proposed_by uuid not null references members(id),
+  type text not null check (type in ('benzina', 'cibo_bagno', 'attesa', 'altro')),
+  note text,
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected', 'expired')),
+  created_at timestamptz not null default now(),
+  expires_at timestamptz not null default (now() + interval '15 minutes')
+);
+
+create table stop_proposal_votes (
+  proposal_id uuid not null references stop_proposals(id) on delete cascade,
+  member_id uuid not null references members(id),
+  vote text not null check (vote in ('yes', 'no')),
+  voted_at timestamptz not null default now(),
+  primary key (proposal_id, member_id)
+);
+
 -- ─── spese generali (scope: tutta la stanza o un sottoinsieme) ─────────
 create table general_expenses (
   id uuid primary key default gen_random_uuid(),
@@ -148,6 +171,8 @@ create index idx_car_passengers_car on car_passengers(car_id);
 create index idx_car_expenses_car on car_expenses(car_id);
 create index idx_car_cargo_car on car_cargo(car_id);
 create index idx_delay_reports_car on delay_reports(car_id);
+create index idx_stop_proposals_room on stop_proposals(room_id);
+create index idx_stop_proposal_votes_proposal on stop_proposal_votes(proposal_id);
 create index idx_general_expenses_room on general_expenses(room_id);
 create index idx_general_expense_participants_expense on general_expense_participants(expense_id);
 create index idx_board_notes_room on board_notes(room_id);
@@ -173,6 +198,8 @@ alter table board_notes enable row level security;
 alter table board_links enable row level security;
 alter table radar_positions enable row level security;
 alter table room_checklist_items enable row level security;
+alter table stop_proposals enable row level security;
+alter table stop_proposal_votes enable row level security;
 
 create policy "rooms: all" on rooms for all using (true) with check (true);
 create policy "members: all" on members for all using (true) with check (true);
@@ -219,6 +246,30 @@ with check (
   )
 );
 
+create policy "stop_proposals: scoped to room members" on stop_proposals for all
+using (
+  exists (select 1 from members m where m.room_id = stop_proposals.room_id and m.auth_user_id = auth.uid())
+)
+with check (
+  exists (select 1 from members m where m.room_id = stop_proposals.room_id and m.auth_user_id = auth.uid())
+);
+
+create policy "stop_proposal_votes: scoped to room members" on stop_proposal_votes for all
+using (
+  exists (
+    select 1 from stop_proposals sp
+    join members m on m.room_id = sp.room_id
+    where sp.id = stop_proposal_votes.proposal_id and m.auth_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from stop_proposals sp
+    join members m on m.room_id = sp.room_id
+    where sp.id = stop_proposal_votes.proposal_id and m.auth_user_id = auth.uid()
+  )
+);
+
 -- ─── Realtime ───────────────────────────────────────────────────────────
 alter publication supabase_realtime add table rooms;
 alter publication supabase_realtime add table members;
@@ -233,3 +284,5 @@ alter publication supabase_realtime add table board_notes;
 alter publication supabase_realtime add table board_links;
 alter publication supabase_realtime add table radar_positions;
 alter publication supabase_realtime add table room_checklist_items;
+alter publication supabase_realtime add table stop_proposals;
+alter publication supabase_realtime add table stop_proposal_votes;

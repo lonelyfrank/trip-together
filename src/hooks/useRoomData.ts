@@ -14,6 +14,8 @@ import type {
   RadarPosition,
   Room,
   RoomChecklistItem,
+  StopProposal,
+  StopProposalVote,
 } from '../types'
 
 interface RoomData {
@@ -31,6 +33,8 @@ interface RoomData {
   boardLinks: BoardLink[]
   radarPositions: RadarPosition[]
   roomChecklistItems: RoomChecklistItem[]
+  stopProposals: StopProposal[]
+  stopProposalVotes: StopProposalVote[]
 }
 
 const EMPTY: RoomData = {
@@ -48,6 +52,8 @@ const EMPTY: RoomData = {
   boardLinks: [],
   radarPositions: [],
   roomChecklistItems: [],
+  stopProposals: [],
+  stopProposalVotes: [],
 }
 
 export function useRoomData(roomId: string | undefined) {
@@ -68,6 +74,8 @@ export function useRoomData(roomId: string | undefined) {
       boardLinksRes,
       radarRes,
       roomChecklistRes,
+      stopProposalsRes,
+      stopProposalVotesRes,
     ] = await Promise.all([
       supabase.from('rooms').select('*').eq('id', id).maybeSingle(),
       supabase.from('members').select('*').eq('room_id', id),
@@ -85,6 +93,11 @@ export function useRoomData(roomId: string | undefined) {
       supabase.from('board_links').select('*').eq('room_id', id),
       supabase.from('radar_positions').select('*').eq('room_id', id),
       supabase.from('room_checklist_items').select('*').eq('room_id', id),
+      supabase.from('stop_proposals').select('*').eq('room_id', id),
+      supabase
+        .from('stop_proposal_votes')
+        .select('*, stop_proposals!inner(room_id)')
+        .eq('stop_proposals.room_id', id),
     ])
 
     setData({
@@ -102,6 +115,8 @@ export function useRoomData(roomId: string | undefined) {
       boardLinks: boardLinksRes.data ?? [],
       radarPositions: radarRes.data ?? [],
       roomChecklistItems: roomChecklistRes.data ?? [],
+      stopProposals: stopProposalsRes.data ?? [],
+      stopProposalVotes: stopProposalVotesRes.data ?? [],
     })
   }, [])
 
@@ -159,6 +174,12 @@ export function useRoomData(roomId: string | undefined) {
         { event: '*', schema: 'public', table: 'room_checklist_items', filter: `room_id=eq.${roomId}` },
         () => loadAll(roomId),
       )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'stop_proposals', filter: `room_id=eq.${roomId}` },
+        () => loadAll(roomId),
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'stop_proposal_votes' }, () => loadAll(roomId))
       .subscribe()
 
     return () => {

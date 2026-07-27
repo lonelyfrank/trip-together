@@ -4,8 +4,18 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { supabase } from '../../lib/supabase'
-import type { Car, CarCargoItem, CarExpense, CarPassenger, DelayReport, Member } from '../../types'
+import type {
+  Car,
+  CarCargoItem,
+  CarExpense,
+  CarPassenger,
+  DelayReport,
+  Member,
+  StopProposal,
+  StopProposalVote,
+} from '../../types'
 import DelayReportBadge from './DelayReportBadge'
+import StopProposalsSection from './StopProposalsSection'
 import TravelStatusChip from './TravelStatusChip'
 
 interface AutoTabProps {
@@ -17,6 +27,8 @@ interface AutoTabProps {
   carExpenses: CarExpense[]
   carCargo: CarCargoItem[]
   delayReports: DelayReport[]
+  stopProposals: StopProposal[]
+  stopProposalVotes: StopProposalVote[]
 }
 
 export default function AutoTab({
@@ -28,6 +40,8 @@ export default function AutoTab({
   carExpenses,
   carCargo,
   delayReports,
+  stopProposals,
+  stopProposalVotes,
 }: AutoTabProps) {
   const [addingCar, setAddingCar] = useState(false)
   const [seats, setSeats] = useState('4')
@@ -72,8 +86,21 @@ export default function AutoTab({
     await supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId })
   }
 
+  const roomWideProposals = stopProposals.filter((p) => p.car_id === null)
+
   return (
     <div className="space-y-3 px-4 pb-28 sm:px-6">
+      <StopProposalsSection
+        roomId={roomId}
+        carId={null}
+        currentMember={currentMember}
+        eligibleMembers={members}
+        proposals={roomWideProposals}
+        votes={stopProposalVotes}
+        canPropose={cars.some((c) => c.travel_status === 'in_viaggio')}
+        title="Proposte per tutta la comitiva"
+      />
+
       {!iAmDriver && !currentCarId && (
         <>
           {addingCar ? (
@@ -153,6 +180,21 @@ export default function AutoTab({
                 currentMemberId={currentMember.id}
                 canReport={(iAmThisDriver || iAmInThisCar) && car.travel_status === 'in_viaggio'}
                 activeDelay={delayReports.find((d) => d.car_id === car.id && !d.resolved_at)}
+              />
+            </div>
+
+            <div className="mb-3">
+              <StopProposalsSection
+                roomId={roomId}
+                carId={car.id}
+                currentMember={currentMember}
+                eligibleMembers={[car.driver_member_id, ...passengers.map((p) => p.member_id)]
+                  .map((id) => memberById(id))
+                  .filter((m): m is Member => !!m)}
+                proposals={stopProposals.filter((p) => p.car_id === car.id)}
+                votes={stopProposalVotes}
+                canPropose={(iAmThisDriver || iAmInThisCar) && car.travel_status === 'in_viaggio'}
+                title="Proposte per quest'auto"
               />
             </div>
 

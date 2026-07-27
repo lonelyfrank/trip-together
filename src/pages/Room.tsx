@@ -53,6 +53,8 @@ export default function RoomPage() {
     generalExpenseParticipants,
     radarPositions,
     roomChecklistItems,
+    stopProposals,
+    stopProposalVotes,
   } = useRoomData(checkedMembership ? roomId : undefined)
 
   if (!checkedMembership || loading) {
@@ -116,6 +118,8 @@ export default function RoomPage() {
             carExpenses={carExpenses}
             carCargo={carCargo}
             delayReports={delayReports}
+            stopProposals={stopProposals}
+            stopProposalVotes={stopProposalVotes}
           />
         ) : (
           <div className="px-4 py-8 text-center text-sm text-muted sm:px-6">Membro non trovato.</div>
