@@ -107,3 +107,15 @@ export interface RadarPosition {
   lng: number
   updated_at: string
 }
+
+export type ChecklistItemStatus = 'da_portare' | 'portato'
+
+export interface RoomChecklistItem {
+  id: string
+  room_id: string
+  title: string
+  assigned_to: string | null
+  status: ChecklistItemStatus
+  created_by: string
+  created_at: string
+}

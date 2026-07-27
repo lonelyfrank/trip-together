@@ -52,6 +52,7 @@ export default function RoomPage() {
     generalExpenses,
     generalExpenseParticipants,
     radarPositions,
+    roomChecklistItems,
   } = useRoomData(checkedMembership ? roomId : undefined)
 
   if (!checkedMembership || loading) {
@@ -119,7 +120,19 @@ export default function RoomPage() {
         ) : (
           <div className="px-4 py-8 text-center text-sm text-muted sm:px-6">Membro non trovato.</div>
         ))}
-      {tab === 'bacheca' && <BachecaTab roomId={room.id} boardNotes={boardNotes} boardLinks={boardLinks} />}
+      {tab === 'bacheca' &&
+        (currentMember ? (
+          <BachecaTab
+            roomId={room.id}
+            currentMember={currentMember}
+            members={members}
+            boardNotes={boardNotes}
+            boardLinks={boardLinks}
+            roomChecklistItems={roomChecklistItems}
+          />
+        ) : (
+          <div className="px-4 py-8 text-center text-sm text-muted sm:px-6">Membro non trovato.</div>
+        ))}
       {tab === 'spese' &&
         (currentMember ? (
           <SpeseTab

@@ -7,6 +7,7 @@ create extension if not exists pgcrypto;
 
 -- ─── drop (ordine inverso alle dipendenze) ─────────────────────────────
 drop table if exists radar_positions cascade;
+drop table if exists room_checklist_items cascade;
 drop table if exists board_links cascade;
 drop table if exists board_notes cascade;
 drop table if exists general_expense_participants cascade;
@@ -121,6 +122,17 @@ create table board_links (
   url text not null
 );
 
+-- ─── checklist di stanza (trasversale, distinta dal carico per auto) ───
+create table room_checklist_items (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid references rooms(id) on delete cascade,
+  title text not null,
+  assigned_to uuid references members(id),
+  status text not null default 'da_portare' check (status in ('da_portare', 'portato')),
+  created_by uuid not null references members(id),
+  created_at timestamptz not null default now()
+);
+
 -- ─── radar: mai storicizzata, sempre sovrascritta ──────────────────────
 create table radar_positions (
   member_id uuid primary key references members(id) on delete cascade,
@@ -140,6 +152,7 @@ create index idx_general_expenses_room on general_expenses(room_id);
 create index idx_general_expense_participants_expense on general_expense_participants(expense_id);
 create index idx_board_notes_room on board_notes(room_id);
 create index idx_board_links_room on board_links(room_id);
+create index idx_room_checklist_room on room_checklist_items(room_id);
 create index idx_radar_room on radar_positions(room_id);
 
 -- ─── Row Level Security ─────────────────────────────────────────────────
@@ -159,6 +172,7 @@ alter table general_expense_participants enable row level security;
 alter table board_notes enable row level security;
 alter table board_links enable row level security;
 alter table radar_positions enable row level security;
+alter table room_checklist_items enable row level security;
 
 create policy "rooms: all" on rooms for all using (true) with check (true);
 create policy "members: all" on members for all using (true) with check (true);
@@ -190,6 +204,21 @@ create policy "board_notes: all" on board_notes for all using (true) with check 
 create policy "board_links: all" on board_links for all using (true) with check (true);
 create policy "radar_positions: all" on radar_positions for all using (true) with check (true);
 
+-- room_checklist_items ha room_id diretto: scoped ai membri della stanza.
+create policy "room_checklist_items: scoped to room members" on room_checklist_items for all
+using (
+  exists (
+    select 1 from members m
+    where m.room_id = room_checklist_items.room_id and m.auth_user_id = auth.uid()
+  )
+)
+with check (
+  exists (
+    select 1 from members m
+    where m.room_id = room_checklist_items.room_id and m.auth_user_id = auth.uid()
+  )
+);
+
 -- ─── Realtime ───────────────────────────────────────────────────────────
 alter publication supabase_realtime add table rooms;
 alter publication supabase_realtime add table members;
@@ -203,3 +232,4 @@ alter publication supabase_realtime add table general_expense_participants;
 alter publication supabase_realtime add table board_notes;
 alter publication supabase_realtime add table board_links;
 alter publication supabase_realtime add table radar_positions;
+alter publication supabase_realtime add table room_checklist_items;

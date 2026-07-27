@@ -3,15 +3,26 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { supabase } from '../../lib/supabase'
-import type { BoardLink, BoardNote } from '../../types'
+import type { BoardLink, BoardNote, Member, RoomChecklistItem } from '../../types'
+import ChecklistSection from './ChecklistSection'
 
 interface BachecaTabProps {
   roomId: string
+  currentMember: Member
+  members: Member[]
   boardNotes: BoardNote[]
   boardLinks: BoardLink[]
+  roomChecklistItems: RoomChecklistItem[]
 }
 
-export default function BachecaTab({ roomId, boardNotes, boardLinks }: BachecaTabProps) {
+export default function BachecaTab({
+  roomId,
+  currentMember,
+  members,
+  boardNotes,
+  boardLinks,
+  roomChecklistItems,
+}: BachecaTabProps) {
   const [addingNote, setAddingNote] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [notePinned, setNotePinned] = useState(false)
@@ -92,6 +103,10 @@ export default function BachecaTab({ roomId, boardNotes, boardLinks }: BachecaTa
           <Plus size={15} /> Aggiungi nota
         </Button>
       )}
+
+      <div className="border-t border-border-soft pt-3">
+        <ChecklistSection roomId={roomId} currentMember={currentMember} members={members} items={roomChecklistItems} />
+      </div>
 
       <p className="pt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Link utili</p>
       <div className="space-y-2">

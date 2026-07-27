@@ -13,6 +13,7 @@ import type {
   Member,
   RadarPosition,
   Room,
+  RoomChecklistItem,
 } from '../types'
 
 interface RoomData {
@@ -29,6 +30,7 @@ interface RoomData {
   boardNotes: BoardNote[]
   boardLinks: BoardLink[]
   radarPositions: RadarPosition[]
+  roomChecklistItems: RoomChecklistItem[]
 }
 
 const EMPTY: RoomData = {
@@ -45,6 +47,7 @@ const EMPTY: RoomData = {
   boardNotes: [],
   boardLinks: [],
   radarPositions: [],
+  roomChecklistItems: [],
 }
 
 export function useRoomData(roomId: string | undefined) {
@@ -64,6 +67,7 @@ export function useRoomData(roomId: string | undefined) {
       boardNotesRes,
       boardLinksRes,
       radarRes,
+      roomChecklistRes,
     ] = await Promise.all([
       supabase.from('rooms').select('*').eq('id', id).maybeSingle(),
       supabase.from('members').select('*').eq('room_id', id),
@@ -80,6 +84,7 @@ export function useRoomData(roomId: string | undefined) {
       supabase.from('board_notes').select('*').eq('room_id', id),
       supabase.from('board_links').select('*').eq('room_id', id),
       supabase.from('radar_positions').select('*').eq('room_id', id),
+      supabase.from('room_checklist_items').select('*').eq('room_id', id),
     ])
 
     setData({
@@ -96,6 +101,7 @@ export function useRoomData(roomId: string | undefined) {
       boardNotes: boardNotesRes.data ?? [],
       boardLinks: boardLinksRes.data ?? [],
       radarPositions: radarRes.data ?? [],
+      roomChecklistItems: roomChecklistRes.data ?? [],
     })
   }, [])
 
@@ -146,6 +152,11 @@ export function useRoomData(roomId: string | undefined) {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'radar_positions', filter: `room_id=eq.${roomId}` },
+        () => loadAll(roomId),
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'room_checklist_items', filter: `room_id=eq.${roomId}` },
         () => loadAll(roomId),
       )
       .subscribe()
