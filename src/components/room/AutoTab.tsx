@@ -5,6 +5,7 @@ import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarCargoItem, CarExpense, CarPassenger, Member } from '../../types'
+import TravelStatusChip from './TravelStatusChip'
 
 interface AutoTabProps {
   roomId: string
@@ -113,19 +114,21 @@ export default function AutoTab({
 
         return (
           <Card key={car.id}>
-            <div className="mb-2.5 flex items-center justify-between">
+            <div className="mb-2.5 flex items-start justify-between">
               <div>
                 <p className="font-serif text-[16px] leading-none text-cream">Auto di {driver?.display_name ?? '—'}</p>
                 <p className="mt-0.5 font-mono text-[10px] text-muted">conducente</p>
               </div>
-              <div className="flex items-center gap-2">
-                <Chip tone="teal">{passengers.length + 1}/{car.seats_total} posti</Chip>
-                {iAmThisDriver && (
-                  <button onClick={() => removeCar(car.id)} className="text-[10px] text-coral underline">
-                    elimina
-                  </button>
-                )}
-              </div>
+              <TravelStatusChip car={car} currentMemberId={currentMember.id} canEdit={iAmThisDriver || iAmInThisCar} />
+            </div>
+
+            <div className="mb-2.5 flex items-center justify-between">
+              <Chip tone="teal">{passengers.length + 1}/{car.seats_total} posti</Chip>
+              {iAmThisDriver && (
+                <button onClick={() => removeCar(car.id)} className="text-[10px] text-coral underline">
+                  elimina
+                </button>
+              )}
             </div>
 
             <div className="mb-3 flex flex-wrap gap-1.5">

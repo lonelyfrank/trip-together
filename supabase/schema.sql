@@ -47,6 +47,10 @@ create table cars (
   room_id uuid references rooms(id) on delete cascade,
   driver_member_id uuid references members(id),
   seats_total int not null, -- il conducente occupa già un posto
+  travel_status text not null default 'non_partita'
+    check (travel_status in ('non_partita', 'in_partenza', 'in_viaggio', 'fermo', 'arrivata')),
+  travel_status_updated_at timestamptz not null default now(),
+  travel_status_updated_by uuid references members(id),
   created_at timestamptz default now()
 );
 

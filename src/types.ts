@@ -22,11 +22,16 @@ export interface Member {
   created_at: string
 }
 
+export type TravelStatus = 'non_partita' | 'in_partenza' | 'in_viaggio' | 'fermo' | 'arrivata'
+
 export interface Car {
   id: string
   room_id: string
   driver_member_id: string
   seats_total: number
+  travel_status: TravelStatus
+  travel_status_updated_at: string
+  travel_status_updated_by: string | null
   created_at: string
 }
 

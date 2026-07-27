@@ -14,6 +14,8 @@ interface ChipProps {
 
 export default function Chip({ children, tone = 'muted' }: ChipProps) {
   return (
-    <span className={`rounded-full px-2 py-1 font-mono text-[10px] ${TONES[tone]}`}>{children}</span>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 font-mono text-[10px] ${TONES[tone]}`}>
+      {children}
+    </span>
   )
 }
