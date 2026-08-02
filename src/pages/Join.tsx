@@ -2,8 +2,8 @@ import { type FormEvent, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import Button from '../components/ui/Button'
 import ScreenHeader from '../components/ui/ScreenHeader'
-import { getMyName, saveRoomEntry, setMyName } from '../lib/localRooms'
-import { ensureAnonymousSession, supabase } from '../lib/supabase'
+import { getMyName } from '../lib/localRooms'
+import { joinRoomByInviteCode } from '../lib/membership'
 
 export default function Join() {
   const { inviteCode } = useParams<{ inviteCode: string }>()
@@ -19,30 +19,12 @@ export default function Join() {
     setSubmitting(true)
     setError(null)
     try {
-      const session = await ensureAnonymousSession()
-      const userId = session!.user.id
-
-      const { data: room, error: roomError } = await supabase
-        .from('rooms')
-        .select('id')
-        .eq('invite_code', inviteCode.toUpperCase())
-        .maybeSingle()
-      if (roomError) throw roomError
-      if (!room) {
+      const result = await joinRoomByInviteCode(inviteCode, name)
+      if ('notFound' in result) {
         setNotFound(true)
         return
       }
-
-      const { data: member, error: memberError } = await supabase
-        .from('members')
-        .insert({ room_id: room.id, display_name: name.trim(), auth_user_id: userId, role: 'guest' })
-        .select()
-        .single()
-      if (memberError) throw memberError
-
-      setMyName(name.trim())
-      saveRoomEntry({ roomId: room.id, memberId: member.id, inviteCode: inviteCode.toUpperCase() })
-      navigate(`/room/${room.id}`)
+      navigate(`/room/${result.roomId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore imprevisto')
     } finally {

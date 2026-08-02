@@ -198,5 +198,5 @@ export function useRoomData(roomId: string | undefined) {
     }
   }, [roomId, loadAll])
 
-  return { ...data, reload: () => roomId && loadAll(roomId) }
+  return data
 }

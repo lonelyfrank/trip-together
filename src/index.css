@@ -1,9 +1,11 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  --font-serif: 'Fraunces', ui-serif, Georgia, serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-sans: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  /* Titoli/heading: sempre Roboto, distinti solo dal peso (vedi .font-serif sotto). */
+  --font-serif: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  /* Dati/codici/importi: Roboto Mono per allineamento tabellare. */
+  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, monospace;
 
   /* Palette "obsidian" */
   --color-ink: #0a0a0f;
@@ -30,6 +32,16 @@ body {
   min-height: 100svh;
   background: var(--color-ink);
   color: var(--color-cream);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* I titoli usano ancora l'utility .font-serif ma ora rendono in Roboto:
+   li distinguiamo con peso e tracking più stretto invece che con un family serif. */
+.font-serif {
+  font-weight: 700;
+  letter-spacing: -0.015em;
 }
 
 @keyframes radar-sweep {

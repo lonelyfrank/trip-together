@@ -1,15 +1,25 @@
-import { ChevronRight, Clock, Plus, Users } from 'lucide-react'
+import { Calendar, ChevronRight, MapPin, Plus, Ticket, Users } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import BottomSheet from '../components/ui/BottomSheet'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
 import ScreenHeader from '../components/ui/ScreenHeader'
 import { useMyRooms } from '../hooks/useMyRooms'
-import { getCrew, getMyName, saveRoomEntry, setMyName } from '../lib/localRooms'
-import { generateRoomCode } from '../lib/roomCode'
-import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import { tintForRoom } from '../lib/eventTint'
+import { getCrew, getMyName } from '../lib/localRooms'
+import { createRoomAndJoin } from '../lib/membership'
+
+function formatEventTime(iso: string): string {
+  return new Date(iso).toLocaleString('it-IT', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 export default function Home() {
   const navigate = useNavigate()
@@ -35,27 +45,8 @@ export default function Home() {
     setSubmitting(true)
     setError(null)
     try {
-      const session = await ensureAnonymousSession()
-      const userId = session!.user.id
-      const inviteCode = generateRoomCode()
-
-      const { data: room, error: roomError } = await supabase
-        .from('rooms')
-        .insert({ invite_code: inviteCode, title: title.trim(), created_by: userId })
-        .select()
-        .single()
-      if (roomError) throw roomError
-
-      const { data: member, error: memberError } = await supabase
-        .from('members')
-        .insert({ room_id: room.id, display_name: name.trim(), auth_user_id: userId, role: 'creator' })
-        .select()
-        .single()
-      if (memberError) throw memberError
-
-      setMyName(name.trim())
-      saveRoomEntry({ roomId: room.id, memberId: member.id, inviteCode })
-      navigate(`/room/${room.id}`)
+      const roomId = await createRoomAndJoin(title, name)
+      navigate(`/room/${roomId}`)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Errore imprevisto')
     } finally {
@@ -69,14 +60,18 @@ export default function Home() {
     navigate(`/join/${joinCode.trim().toUpperCase()}`)
   }
 
+  function openCreate() {
+    setName(getMyName())
+    setError(null)
+    setCreating(true)
+  }
+
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink">
       <ScreenHeader eyebrow="I tuoi eventi" title={myName ? `Ciao, ${myName}` : 'Trip Together'} />
 
       <div className="flex-1 space-y-5 px-4 pb-28 sm:px-6">
-        {error && (
-          <p className="rounded-xl bg-coral/10 px-4 py-2 text-sm text-coral">{error}</p>
-        )}
+        {error && !creating && <p className="rounded-xl bg-coral/10 px-4 py-2 text-sm text-coral">{error}</p>}
 
         {crew.length > 0 && (
           <Card tone="highlight">
@@ -103,9 +98,9 @@ export default function Home() {
                 </div>
               )}
             </div>
-            <p className="text-[11px] text-muted">
-              Quando crei una stanza, ricordati di condividere il link con loro.
-            </p>
+            <Button variant="teal" size="sm" className="w-full" onClick={openCreate}>
+              <Plus size={14} /> Nuovo evento con questa comitiva
+            </Button>
           </Card>
         )}
 
@@ -127,16 +122,25 @@ export default function Home() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-serif text-[16px] leading-tight text-cream">{room.title}</p>
-                    {room.destination_label && (
-                      <p className="mt-0.5 flex items-center gap-1 truncate font-mono text-[11px] text-muted">
-                        <Clock size={10} /> {room.destination_label}
-                      </p>
-                    )}
+                    <div className="mt-0.5 flex flex-col gap-0.5">
+                      {room.event_time && (
+                        <span className="flex items-center gap-1 font-mono text-[11px] text-muted">
+                          <Calendar size={10} /> {formatEventTime(room.event_time)}
+                        </span>
+                      )}
+                      {room.destination_label && (
+                        <span className="flex items-center gap-1 truncate font-mono text-[11px] text-muted">
+                          <MapPin size={10} /> {room.destination_label}
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <ChevronRight size={16} className="shrink-0 text-muted" />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-1.5 pl-14">
-                  <Chip>{memberCount} member{memberCount === 1 ? 'o' : 'i'}</Chip>
+                  <Chip>
+                    {memberCount} member{memberCount === 1 ? 'o' : 'i'}
+                  </Chip>
                   {openBalance && <Chip tone="alert">saldi aperti</Chip>}
                   {radarActive && <Chip tone="teal">radar attivo</Chip>}
                 </div>
@@ -157,9 +161,7 @@ export default function Home() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-[14px] text-cream">{room.title}</p>
-                      <p className="mt-0.5 font-mono text-[11px] text-muted">
-                        {memberCount} membri · saldi chiusi
-                      </p>
+                      <p className="mt-0.5 font-mono text-[11px] text-muted">{memberCount} membri · saldi chiusi</p>
                     </div>
                   </div>
                 </Card>
@@ -189,46 +191,38 @@ export default function Home() {
         ) : (
           <button
             onClick={() => setJoining(true)}
-            className="font-mono text-[11px] text-muted underline underline-offset-2"
+            className="flex items-center gap-1.5 font-mono text-[11px] text-muted underline underline-offset-2"
           >
-            Hai un codice invito?
+            <Ticket size={12} /> Hai un codice invito?
           </button>
         )}
       </div>
 
-      {creating && (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-black/50" onClick={() => setCreating(false)}>
-          <form
-            onSubmit={createRoom}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg rounded-t-[28px] border-t border-border-strong bg-highlight-to px-6 pb-8 pt-3"
-          >
-            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border-dashed" />
-            <p className="mb-4 font-serif text-[18px] text-cream">Nuova stanza</p>
-            <div className="flex flex-col gap-3">
-              <input
-                autoFocus
-                className="rounded-lg border border-border-soft bg-ink px-3 py-2.5 text-cream placeholder:text-muted"
-                placeholder="Nome evento (es. Ritrovo al Faro)"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <input
-                className="rounded-lg border border-border-soft bg-ink px-3 py-2.5 text-cream placeholder:text-muted"
-                placeholder="Il tuo nome"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Creazione...' : 'Crea stanza'}
-              </Button>
-            </div>
-          </form>
-        </div>
-      )}
+      <BottomSheet open={creating} onClose={() => setCreating(false)} title="Nuova stanza">
+        <form onSubmit={createRoom} className="flex flex-col gap-3">
+          {error && creating && <p className="rounded-xl bg-coral/10 px-4 py-2 text-sm text-coral">{error}</p>}
+          <input
+            autoFocus
+            className="rounded-lg border border-border-soft bg-ink px-3 py-2.5 text-cream placeholder:text-muted"
+            placeholder="Nome evento (es. Ritrovo al Faro)"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+          <input
+            className="rounded-lg border border-border-soft bg-ink px-3 py-2.5 text-cream placeholder:text-muted"
+            placeholder="Il tuo nome"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Button type="submit" disabled={submitting || !title.trim() || !name.trim()}>
+            {submitting ? 'Creazione...' : 'Crea stanza'}
+          </Button>
+          <p className="text-center font-mono text-[10px] text-muted">Destinazione e data si impostano dentro la stanza.</p>
+        </form>
+      </BottomSheet>
 
       <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg bg-gradient-to-t from-ink via-ink px-4 pb-8 pt-4 sm:px-6">
-        <Button className="w-full" onClick={() => setCreating(true)}>
+        <Button className="w-full" onClick={openCreate}>
           <Plus size={16} /> Crea nuova stanza
         </Button>
       </div>

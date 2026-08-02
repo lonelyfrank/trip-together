@@ -28,7 +28,7 @@ Definita come token Tailwind v4 in `src/index.css` (`@theme`). Usare sempre i no
 | `teal` | accento (stati positivi/attivi) | `#46d9c9` |
 | `coral` | alert (saldi aperti, ritardi, errori) | `#e76f51` |
 
-Font (Google Fonts, caricati in `index.html`): `font-serif` = Fraunces (titoli), `font-sans` = Inter (corpo, default), `font-mono` = IBM Plex Mono (dati/importi/codici/eyebrow).
+Font (Google Fonts, caricati in `index.html`): tutto Roboto. `font-sans` = Roboto (corpo, default); `font-serif` = Roboto ma con `font-weight:700` + tracking stretto via regola in `index.css` (usato per i titoli — mantiene la gerarchia senza un family serif separato); `font-mono` = Roboto Mono (dati/importi/codici/eyebrow, per allineamento tabellare).
 
 ## Componenti ricorrenti (in `src/components/ui/`)
 

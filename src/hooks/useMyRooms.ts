@@ -68,5 +68,5 @@ export function useMyRooms() {
     reload()
   }, [])
 
-  return { summaries, loading, reload }
+  return { summaries, loading }
 }

@@ -39,7 +39,7 @@ export function getCrew(): string[] {
   }
 }
 
-export function addToCrew(name: string) {
+function addToCrew(name: string) {
   const trimmed = name.trim()
   if (!trimmed) return
   const crew = getCrew()
