@@ -1,8 +1,6 @@
-import { Check, MapPin, Navigation, Plus } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { Check, Share2 } from 'lucide-react'
+import { useState } from 'react'
 import Button from '../ui/Button'
-import Card from '../ui/Card'
-import { supabase } from '../../lib/supabase'
 import type {
   Car,
   CarExpense,
@@ -12,8 +10,8 @@ import type {
   Member,
   Room,
 } from '../../types'
-import MapSheet from '../MapSheet'
 import CloseRoomSection from './CloseRoomSection'
+import DestinationCard from './DestinationCard'
 import ReadinessBanner from './ReadinessBanner'
 
 interface StanzaTabProps {
@@ -49,40 +47,32 @@ export default function StanzaTab({
   onGoToAuto,
   onClosed,
 }: StanzaTabProps) {
-  const [mapOpen, setMapOpen] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [label, setLabel] = useState(room.destination_label ?? '')
-  const [lat, setLat] = useState(room.destination_lat?.toString() ?? '')
-  const [lng, setLng] = useState(room.destination_lng?.toString() ?? '')
-  const [eventTime, setEventTime] = useState(room.event_time?.slice(0, 16) ?? '')
-  const [saving, setSaving] = useState(false)
-  const [copied, setCopied] = useState(false)
+  const [shared, setShared] = useState(false)
 
-  const hasCoords = room.destination_lat !== null && room.destination_lng !== null
+  const inviteUrl = `${window.location.origin}/join/${room.invite_code}`
 
-  async function saveDestination(e: FormEvent) {
-    e.preventDefault()
-    setSaving(true)
-    try {
-      await supabase
-        .from('rooms')
-        .update({
-          destination_label: label.trim() || null,
-          destination_lat: lat.trim() ? Number(lat) : null,
-          destination_lng: lng.trim() ? Number(lng) : null,
-          event_time: eventTime ? new Date(eventTime).toISOString() : null,
-        })
-        .eq('id', room.id)
-      setEditing(false)
-    } finally {
-      setSaving(false)
+  async function invite() {
+    const shareData = {
+      title: room.title,
+      text: `Unisciti a "${room.title}" su Trip Together`,
+      url: inviteUrl,
     }
-  }
-
-  function copyInviteLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/join/${room.invite_code}`)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    // Condivisione nativa dove disponibile (mobile), altrimenti copia negli appunti.
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData)
+        return
+      } catch {
+        // annullata dall'utente o non consentita: ripiega sulla copia
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setShared(true)
+      setTimeout(() => setShared(false), 1500)
+    } catch {
+      // clipboard non disponibile: nessuna azione, l'utente vede comunque il codice nell'header
+    }
   }
 
   return (
@@ -96,88 +86,12 @@ export default function StanzaTab({
         onGoToAuto={onGoToAuto}
       />
 
-      <Card tone="highlight">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="flex items-center gap-1.5 text-amber">
-            <MapPin size={13} strokeWidth={2.5} />
-            <span className="font-mono text-[10px] uppercase tracking-[0.18em]">Destinazione</span>
-          </div>
-          {!editing && (
-            <button onClick={() => setEditing(true)} className="font-mono text-[10px] text-muted underline">
-              modifica
-            </button>
-          )}
-        </div>
-
-        {editing ? (
-          <form onSubmit={saveDestination} className="flex flex-col gap-2">
-            <input
-              autoFocus
-              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
-              placeholder="Nome del posto (es. Spiaggia del Faro)"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <input
-                className="w-1/2 rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
-                placeholder="Latitudine"
-                inputMode="decimal"
-                value={lat}
-                onChange={(e) => setLat(e.target.value)}
-              />
-              <input
-                className="w-1/2 rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
-                placeholder="Longitudine"
-                inputMode="decimal"
-                value={lng}
-                onChange={(e) => setLng(e.target.value)}
-              />
-            </div>
-            <input
-              type="datetime-local"
-              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
-              value={eventTime}
-              onChange={(e) => setEventTime(e.target.value)}
-            />
-            <div className="flex gap-2">
-              <Button type="submit" variant="teal" size="sm" disabled={saving}>
-                Salva
-              </Button>
-              <Button type="button" variant="outline" size="sm" onClick={() => setEditing(false)}>
-                Annulla
-              </Button>
-            </div>
-          </form>
-        ) : room.destination_label || hasCoords ? (
-          <>
-            <p className="font-serif text-[19px] leading-snug text-cream">
-              {room.destination_label || 'Destinazione senza nome'}
-            </p>
-            {room.event_time && (
-              <p className="mt-0.5 font-mono text-[11px] text-muted">
-                {new Date(room.event_time).toLocaleString('it-IT', {
-                  weekday: 'long',
-                  day: 'numeric',
-                  month: 'long',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </p>
-            )}
-            {hasCoords && (
-              <Button className="mt-3 w-full" onClick={() => setMapOpen(true)}>
-                <Navigation size={14} /> Avvia percorso
-              </Button>
-            )}
-          </>
-        ) : (
-          <p className="text-[13px] text-muted">Nessuna destinazione impostata ancora.</p>
-        )}
-      </Card>
+      <DestinationCard room={room} />
 
       <div>
-        <p className="mb-2.5 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Partecipanti</p>
+        <p className="mb-2.5 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
+          Partecipanti · {members.length}
+        </p>
         <div className="space-y-1.5">
           {members.map((m) => (
             <div key={m.id} className="flex items-center justify-between rounded-xl bg-surface/50 px-3 py-2.5">
@@ -185,7 +99,10 @@ export default function StanzaTab({
                 <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber text-[11px] font-semibold text-ink">
                   {m.display_name[0]?.toUpperCase()}
                 </div>
-                <span className="text-[13.5px] text-cream">{m.display_name}</span>
+                <span className="text-[13.5px] text-cream">
+                  {m.display_name}
+                  {m.id === currentMember.id && <span className="text-muted"> (tu)</span>}
+                </span>
               </div>
               <span className="font-mono text-[10px] text-muted">{roleLabel(m.id, cars, carPassengers)}</span>
             </div>
@@ -193,17 +110,10 @@ export default function StanzaTab({
         </div>
       </div>
 
-      <button
-        onClick={copyInviteLink}
-        className="flex w-full items-center justify-center gap-2 rounded-xl border border-border-soft py-3 text-[13px] font-medium text-cream transition-transform active:scale-[0.98]"
-      >
-        {copied ? <Check size={15} /> : <Plus size={15} />}
-        {copied ? 'Link copiato!' : 'Invita amici'}
-      </button>
-
-      {hasCoords && (
-        <MapSheet open={mapOpen} onClose={() => setMapOpen(false)} lat={room.destination_lat!} lng={room.destination_lng!} />
-      )}
+      <Button variant="surface" className="w-full" onClick={invite}>
+        {shared ? <Check size={15} /> : <Share2 size={15} />}
+        {shared ? 'Link copiato!' : 'Invita amici'}
+      </Button>
 
       <CloseRoomSection
         room={room}
