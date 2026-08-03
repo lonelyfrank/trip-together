@@ -1,6 +1,7 @@
 import { Check, Circle, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Member, RoomChecklistItem } from '../../types'
 
@@ -20,22 +21,31 @@ export default function ChecklistSection({ roomId, currentMember, members, items
   async function addItem(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    await supabase.from('room_checklist_items').insert({ room_id: roomId, title: title.trim(), created_by: currentMember.id })
+    await mutate(
+      'room_checklist_items.insert',
+      supabase.from('room_checklist_items').insert({ room_id: roomId, title: title.trim(), created_by: currentMember.id }),
+    )
     setTitle('')
     setAdding(false)
   }
 
   async function selfAssign(item: RoomChecklistItem) {
-    await supabase.from('room_checklist_items').update({ assigned_to: currentMember.id }).eq('id', item.id)
+    await mutate(
+      'room_checklist_items.selfAssign',
+      supabase.from('room_checklist_items').update({ assigned_to: currentMember.id }).eq('id', item.id),
+    )
   }
 
   async function toggleStatus(item: RoomChecklistItem) {
     const canToggle = currentMember.role === 'creator' || item.assigned_to === currentMember.id
     if (!canToggle) return
-    await supabase
-      .from('room_checklist_items')
-      .update({ status: item.status === 'portato' ? 'da_portare' : 'portato' })
-      .eq('id', item.id)
+    await mutate(
+      'room_checklist_items.toggleStatus',
+      supabase
+        .from('room_checklist_items')
+        .update({ status: item.status === 'portato' ? 'da_portare' : 'portato' })
+        .eq('id', item.id),
+    )
   }
 
   return (

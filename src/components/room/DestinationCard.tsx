@@ -5,6 +5,7 @@ import Card from '../ui/Card'
 import MapSheet from '../MapSheet'
 import EventTimeRow from './EventTimeRow'
 import WeatherStrip from './WeatherStrip'
+import { mutate } from '../../lib/db'
 import { parseMapInput } from '../../lib/mapLinks'
 import { supabase } from '../../lib/supabase'
 import type { Room } from '../../types'
@@ -78,14 +79,17 @@ export default function DestinationCard({ room }: DestinationCardProps) {
     try {
       // Solo la posizione: la data/ora ha un salvataggio separato (EventTimeRow),
       // così non blocca mai il salvataggio della destinazione.
-      const { error } = await supabase
-        .from('rooms')
-        .update({
-          destination_label: label.trim() || null,
-          destination_lat: lat,
-          destination_lng: lng,
-        })
-        .eq('id', room.id)
+      const { error } = await mutate(
+        'rooms.updateDestination',
+        supabase
+          .from('rooms')
+          .update({
+            destination_label: label.trim() || null,
+            destination_lat: lat,
+            destination_lng: lng,
+          })
+          .eq('id', room.id),
+      )
 
       if (error) {
         setSaveError(error.message)

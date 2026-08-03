@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { computeBalances, computeTransfers } from '../../lib/balances'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member, Room } from '../../types'
 
@@ -43,12 +44,12 @@ export default function CloseRoomSection({
     }
     setClosing(true)
     try {
-      await supabase.from('cars').delete().eq('room_id', room.id)
-      await supabase.from('general_expenses').delete().eq('room_id', room.id)
-      await supabase.from('board_notes').delete().eq('room_id', room.id)
-      await supabase.from('board_links').delete().eq('room_id', room.id)
-      await supabase.from('radar_positions').delete().eq('room_id', room.id)
-      await supabase.from('rooms').update({ status: 'closed' }).eq('id', room.id)
+      await mutate('cars.deleteByRoom', supabase.from('cars').delete().eq('room_id', room.id))
+      await mutate('general_expenses.deleteByRoom', supabase.from('general_expenses').delete().eq('room_id', room.id))
+      await mutate('board_notes.deleteByRoom', supabase.from('board_notes').delete().eq('room_id', room.id))
+      await mutate('board_links.deleteByRoom', supabase.from('board_links').delete().eq('room_id', room.id))
+      await mutate('radar_positions.deleteByRoom', supabase.from('radar_positions').delete().eq('room_id', room.id))
+      await mutate('rooms.close', supabase.from('rooms').update({ status: 'closed' }).eq('id', room.id))
       onClosed()
     } finally {
       setClosing(false)

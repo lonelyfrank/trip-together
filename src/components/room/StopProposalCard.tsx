@@ -2,6 +2,7 @@ import { Clock, Fuel, HelpCircle, Utensils } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
+import { mutate } from '../../lib/db'
 import { computeOutcome, remainingFraction } from '../../lib/proposals'
 import { supabase } from '../../lib/supabase'
 import type { Member, StopProposal, StopProposalVote } from '../../types'
@@ -46,9 +47,12 @@ export default function StopProposalCard({ proposal, votes, eligibleMembers, cur
   const canVote = outcome === 'pending' && eligibleMembers.some((m) => m.id === currentMemberId)
 
   async function castVote(vote: 'yes' | 'no') {
-    await supabase
-      .from('stop_proposal_votes')
-      .upsert({ proposal_id: proposal.id, member_id: currentMemberId, vote }, { onConflict: 'proposal_id,member_id' })
+    await mutate(
+      'stop_proposal_votes.cast',
+      supabase
+        .from('stop_proposal_votes')
+        .upsert({ proposal_id: proposal.id, member_id: currentMemberId, vote }, { onConflict: 'proposal_id,member_id' }),
+    )
   }
 
   return (

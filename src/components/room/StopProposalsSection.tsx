@@ -2,6 +2,7 @@ import { Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Member, StopProposal, StopProposalType, StopProposalVote } from '../../types'
 import StopProposalCard from './StopProposalCard'
@@ -46,13 +47,16 @@ export default function StopProposalsSection({
     if (!type) return
     setSaving(true)
     try {
-      await supabase.from('stop_proposals').insert({
-        room_id: roomId,
-        car_id: carId,
-        proposed_by: currentMember.id,
-        type,
-        note: note.trim() || null,
-      })
+      await mutate(
+        'stop_proposals.insert',
+        supabase.from('stop_proposals').insert({
+          room_id: roomId,
+          car_id: carId,
+          proposed_by: currentMember.id,
+          type,
+          note: note.trim() || null,
+        }),
+      )
       setType(null)
       setNote('')
       setOpen(false)

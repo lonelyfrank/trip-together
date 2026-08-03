@@ -2,6 +2,7 @@ import { ChevronRight, ClipboardList, Link2, Pin, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { BoardLink, BoardNote, Member, RoomChecklistItem } from '../../types'
 import ChecklistSection from './ChecklistSection'
@@ -36,20 +37,26 @@ export default function BachecaTab({
   async function addNote(e: FormEvent) {
     e.preventDefault()
     if (!noteText.trim()) return
-    await supabase.from('board_notes').insert({ room_id: roomId, text: noteText.trim(), pinned: notePinned })
+    await mutate(
+      'board_notes.insert',
+      supabase.from('board_notes').insert({ room_id: roomId, text: noteText.trim(), pinned: notePinned }),
+    )
     setNoteText('')
     setNotePinned(false)
     setAddingNote(false)
   }
 
   async function togglePin(note: BoardNote) {
-    await supabase.from('board_notes').update({ pinned: !note.pinned }).eq('id', note.id)
+    await mutate('board_notes.togglePin', supabase.from('board_notes').update({ pinned: !note.pinned }).eq('id', note.id))
   }
 
   async function addLink(e: FormEvent) {
     e.preventDefault()
     if (!linkLabel.trim() || !linkUrl.trim()) return
-    await supabase.from('board_links').insert({ room_id: roomId, label: linkLabel.trim(), url: linkUrl.trim() })
+    await mutate(
+      'board_links.insert',
+      supabase.from('board_links').insert({ room_id: roomId, label: linkLabel.trim(), url: linkUrl.trim() }),
+    )
     setLinkLabel('')
     setLinkUrl('')
     setAddingLink(false)

@@ -10,6 +10,7 @@ import TabBar, { type RoomTabId } from '../components/TabBar'
 import Chip from '../components/ui/Chip'
 import ScreenHeader from '../components/ui/ScreenHeader'
 import { useRoomData } from '../hooks/useRoomData'
+import { query } from '../lib/db'
 import { getSavedRoomEntry } from '../lib/localRooms'
 import { supabase } from '../lib/supabase'
 
@@ -27,15 +28,13 @@ export default function RoomPage() {
       return
     }
 
-    supabase
-      .from('rooms')
-      .select('invite_code')
-      .eq('id', roomId)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) navigate(`/join/${data.invite_code}`, { replace: true })
-        else setCheckedMembership(true) // stanza inesistente: mostrata dallo stato "notFound" sotto
-      })
+    query<{ invite_code: string }>(
+      'rooms.inviteCodeById',
+      supabase.from('rooms').select('invite_code').eq('id', roomId).maybeSingle(),
+    ).then((res) => {
+      if (res.kind === 'ok') navigate(`/join/${res.data.invite_code}`, { replace: true })
+      else setCheckedMembership(true) // stanza inesistente o errore: gestita dallo stato "notFound"/error
+    })
   }, [roomId, navigate])
 
   const {

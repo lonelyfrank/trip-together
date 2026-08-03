@@ -1,6 +1,7 @@
 import { Compass, Radio } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import Button from '../ui/Button'
+import { mutate } from '../../lib/db'
 import { bearingDegrees, distanceMeters, formatDistance, radarIntervalMs } from '../../lib/geo'
 import { supabase } from '../../lib/supabase'
 import type { Member, RadarPosition, Room } from '../../types'
@@ -47,9 +48,12 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
         const lng = pos.coords.longitude
         setMyPos({ lat, lng })
         setError(null)
-        await supabase.from('radar_positions').upsert(
-          { member_id: currentMember.id, room_id: room.id, lat, lng, updated_at: new Date().toISOString() },
-          { onConflict: 'member_id' },
+        await mutate(
+          'radar_positions.upsert',
+          supabase.from('radar_positions').upsert(
+            { member_id: currentMember.id, room_id: room.id, lat, lng, updated_at: new Date().toISOString() },
+            { onConflict: 'member_id' },
+          ),
         )
         const distToDestination = destination ? distanceMeters({ lat, lng }, destination) : null
         timerRef.current = setTimeout(ping, radarIntervalMs(distToDestination))
@@ -67,7 +71,7 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
       if (timerRef.current) clearTimeout(timerRef.current)
       setActive(false)
       setMyPos(null)
-      await supabase.from('radar_positions').delete().eq('member_id', currentMember.id)
+      await mutate('radar_positions.delete', supabase.from('radar_positions').delete().eq('member_id', currentMember.id))
       return
     }
     if (!('geolocation' in navigator)) {

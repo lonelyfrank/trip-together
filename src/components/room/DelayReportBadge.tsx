@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
+import { mutate } from '../../lib/db'
 import { formatRelativeTime } from '../../lib/time'
 import { supabase } from '../../lib/supabase'
 import type { DelayReason, DelayReport } from '../../types'
@@ -32,12 +33,15 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
     if (!reason) return
     setSaving(true)
     try {
-      await supabase.from('delay_reports').insert({
-        car_id: carId,
-        reason,
-        minutes_estimate: minutes,
-        reported_by: currentMemberId,
-      })
+      await mutate(
+        'delay_reports.insert',
+        supabase.from('delay_reports').insert({
+          car_id: carId,
+          reason,
+          minutes_estimate: minutes,
+          reported_by: currentMemberId,
+        }),
+      )
       setReason(null)
       setMinutes(null)
       setOpen(false)
@@ -48,7 +52,10 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
 
   async function resolve() {
     if (!activeDelay) return
-    await supabase.from('delay_reports').update({ resolved_at: new Date().toISOString() }).eq('id', activeDelay.id)
+    await mutate(
+      'delay_reports.resolve',
+      supabase.from('delay_reports').update({ resolved_at: new Date().toISOString() }).eq('id', activeDelay.id),
+    )
   }
 
   if (activeDelay) {

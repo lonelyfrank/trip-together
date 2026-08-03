@@ -1,6 +1,7 @@
 import { Calendar, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Room } from '../../types'
 
@@ -23,7 +24,10 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
     setSaving(true)
     setError(null)
     try {
-      const { error: err } = await supabase.from('rooms').update({ event_time: eventTimeIso }).eq('id', room.id)
+      const { error: err } = await mutate(
+        'rooms.updateEventTime',
+        supabase.from('rooms').update({ event_time: eventTimeIso }).eq('id', room.id),
+      )
       if (err) {
         setError(
           /event_time/.test(err.message)

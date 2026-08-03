@@ -1,6 +1,7 @@
 import { Hand } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarPassenger, Member, RideRequest } from '../../types'
 
@@ -33,21 +34,33 @@ export default function RideRequestsSection({
   )
 
   async function requestRide() {
-    await supabase.from('ride_requests').insert({ room_id: roomId, member_id: currentMember.id })
+    await mutate(
+      'ride_requests.insert',
+      supabase.from('ride_requests').insert({ room_id: roomId, member_id: currentMember.id }),
+    )
   }
 
   async function cancelRequest() {
     if (!myRequest) return
-    await supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', myRequest.id)
+    await mutate(
+      'ride_requests.cancel',
+      supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', myRequest.id),
+    )
   }
 
   async function offerSeat(request: RideRequest) {
     if (!myCarWithFreeSeat) return
-    await supabase.from('car_passengers').insert({ car_id: myCarWithFreeSeat.id, member_id: request.member_id })
-    await supabase
-      .from('ride_requests')
-      .update({ status: 'matched', matched_car_id: myCarWithFreeSeat.id })
-      .eq('id', request.id)
+    await mutate(
+      'car_passengers.offerSeat',
+      supabase.from('car_passengers').insert({ car_id: myCarWithFreeSeat.id, member_id: request.member_id }),
+    )
+    await mutate(
+      'ride_requests.match',
+      supabase
+        .from('ride_requests')
+        .update({ status: 'matched', matched_car_id: myCarWithFreeSeat.id })
+        .eq('id', request.id),
+    )
   }
 
   if (!amUnassigned && othersWaiting.length === 0) return null

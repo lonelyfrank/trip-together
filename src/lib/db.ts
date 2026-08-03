@@ -42,3 +42,16 @@ export function firstError(...qs: Query<unknown>[]): PostgrestError | null {
   for (const q of qs) if (q.kind === 'fail') return q.error
   return null
 }
+
+// Wrapper unico per le scritture (insert/update/delete/upsert): centralizza le
+// mutazioni e garantisce che un errore non sia mai silenzioso (log con
+// "tabella.operazione"). Ritorna { data, error } così chi crea una riga può
+// leggerne il risultato. La gestione ottimistica/rollback arriva allo STEP 4.
+export async function mutate<T = null>(
+  label: string,
+  builder: PromiseLike<{ data?: T | null; error: PostgrestError | null }>,
+): Promise<{ data: T | null; error: PostgrestError | null }> {
+  const res = await builder
+  if (res.error) console.error(`[db] ${label} — ${res.error.message}`)
+  return { data: res.data ?? null, error: res.error }
+}

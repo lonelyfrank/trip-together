@@ -2,6 +2,7 @@ import { AlertTriangle, Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
+import { mutate } from '../../lib/db'
 import { readinessWindow } from '../../lib/readiness'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarPassenger, Member, Room } from '../../types'
@@ -32,10 +33,13 @@ export default function ReadinessBanner({ room, currentMember, members, cars, ca
   const amIWithoutCar = !assignedIds.has(currentMember.id)
 
   async function confirmPresence() {
-    await supabase
-      .from('members')
-      .update({ confirmed: true, confirmed_at: new Date().toISOString() })
-      .eq('id', currentMember.id)
+    await mutate(
+      'members.confirmPresence',
+      supabase
+        .from('members')
+        .update({ confirmed: true, confirmed_at: new Date().toISOString() })
+        .eq('id', currentMember.id),
+    )
   }
 
   return (

@@ -2,6 +2,7 @@ import { Check } from 'lucide-react'
 import { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Chip from '../ui/Chip'
+import { mutate } from '../../lib/db'
 import { formatRelativeTime } from '../../lib/time'
 import { supabase } from '../../lib/supabase'
 import type { Car, TravelStatus } from '../../types'
@@ -27,21 +28,27 @@ export default function TravelStatusChip({ car, currentMemberId, canEdit }: Trav
   const meta = STATUS_META[car.travel_status]
 
   async function setStatus(status: TravelStatus) {
-    await supabase
-      .from('cars')
-      .update({
-        travel_status: status,
-        travel_status_updated_at: new Date().toISOString(),
-        travel_status_updated_by: currentMemberId,
-      })
-      .eq('id', car.id)
+    await mutate(
+      'cars.setTravelStatus',
+      supabase
+        .from('cars')
+        .update({
+          travel_status: status,
+          travel_status_updated_at: new Date().toISOString(),
+          travel_status_updated_by: currentMemberId,
+        })
+        .eq('id', car.id),
+    )
 
     if (status === 'arrivata') {
-      await supabase
-        .from('delay_reports')
-        .update({ resolved_at: new Date().toISOString() })
-        .eq('car_id', car.id)
-        .is('resolved_at', null)
+      await mutate(
+        'delay_reports.resolveOnArrival',
+        supabase
+          .from('delay_reports')
+          .update({ resolved_at: new Date().toISOString() })
+          .eq('car_id', car.id)
+          .is('resolved_at', null),
+      )
     }
 
     setOpen(false)

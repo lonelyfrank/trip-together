@@ -4,6 +4,7 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { computeBalances, computeTransfers } from '../../lib/balances'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member } from '../../types'
 
@@ -50,10 +51,13 @@ export default function SpeseTab({
   }
 
   async function waiveExpense(expenseId: string) {
-    await supabase
-      .from('general_expenses')
-      .update({ waived: true, waived_by_member_id: currentMember.id })
-      .eq('id', expenseId)
+    await mutate(
+      'general_expenses.waive',
+      supabase
+        .from('general_expenses')
+        .update({ waived: true, waived_by_member_id: currentMember.id })
+        .eq('id', expenseId),
+    )
   }
 
   async function addExpense(e: FormEvent) {
@@ -62,16 +66,22 @@ export default function SpeseTab({
     if (!label.trim() || !value || participantIds.length === 0) return
     setSaving(true)
     try {
-      const { data: expense, error } = await supabase
-        .from('general_expenses')
-        .insert({ room_id: roomId, label: label.trim(), amount: value, paid_by_member_id: paidBy })
-        .select()
-        .single()
-      if (error) throw error
+      const { data: expense, error } = await mutate<{ id: string }>(
+        'general_expenses.insert',
+        supabase
+          .from('general_expenses')
+          .insert({ room_id: roomId, label: label.trim(), amount: value, paid_by_member_id: paidBy })
+          .select()
+          .single(),
+      )
+      if (error || !expense) throw error ?? new Error('Inserimento spesa fallito')
 
-      await supabase
-        .from('general_expense_participants')
-        .insert(participantIds.map((memberId) => ({ expense_id: expense.id, member_id: memberId })))
+      await mutate(
+        'general_expense_participants.insert',
+        supabase
+          .from('general_expense_participants')
+          .insert(participantIds.map((memberId) => ({ expense_id: expense.id, member_id: memberId }))),
+      )
 
       setLabel('')
       setAmount('')

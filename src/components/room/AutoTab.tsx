@@ -3,6 +3,7 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
+import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type {
   Car,
@@ -64,7 +65,10 @@ export default function AutoTab({
     if (!total || total < 1) return
     setSavingCar(true)
     try {
-      await supabase.from('cars').insert({ room_id: roomId, driver_member_id: currentMember.id, seats_total: total })
+      await mutate(
+        'cars.insert',
+        supabase.from('cars').insert({ room_id: roomId, driver_member_id: currentMember.id, seats_total: total }),
+      )
       setSeats('4')
       setAddingCar(false)
     } finally {
@@ -73,21 +77,25 @@ export default function AutoTab({
   }
 
   async function removeCar(carId: string) {
-    await supabase.from('cars').delete().eq('id', carId)
+    await mutate('cars.delete', supabase.from('cars').delete().eq('id', carId))
   }
 
   async function takeSeat(carId: string) {
-    if (currentCarId) await supabase.from('car_passengers').delete().eq('member_id', currentMember.id)
-    await supabase.from('car_passengers').insert({ car_id: carId, member_id: currentMember.id })
+    if (currentCarId)
+      await mutate('car_passengers.leave', supabase.from('car_passengers').delete().eq('member_id', currentMember.id))
+    await mutate(
+      'car_passengers.take',
+      supabase.from('car_passengers').insert({ car_id: carId, member_id: currentMember.id }),
+    )
   }
 
   async function leaveSeat() {
-    await supabase.from('car_passengers').delete().eq('member_id', currentMember.id)
+    await mutate('car_passengers.leave', supabase.from('car_passengers').delete().eq('member_id', currentMember.id))
   }
 
   async function assignMember(carId: string, memberId: string) {
-    await supabase.from('car_passengers').delete().eq('member_id', memberId)
-    await supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId })
+    await mutate('car_passengers.reassignClear', supabase.from('car_passengers').delete().eq('member_id', memberId))
+    await mutate('car_passengers.assign', supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId }))
   }
 
   const roomWideProposals = stopProposals.filter((p) => p.car_id === null)
@@ -284,13 +292,16 @@ function CarCargoSection({ carId, cargo }: { carId: string; cargo: CarCargoItem[
   const [item, setItem] = useState('')
 
   async function toggle(cargoItem: CarCargoItem) {
-    await supabase.from('car_cargo').update({ packed: !cargoItem.packed }).eq('id', cargoItem.id)
+    await mutate(
+      'car_cargo.togglePacked',
+      supabase.from('car_cargo').update({ packed: !cargoItem.packed }).eq('id', cargoItem.id),
+    )
   }
 
   async function addItem(e: FormEvent) {
     e.preventDefault()
     if (!item.trim()) return
-    await supabase.from('car_cargo').insert({ car_id: carId, item: item.trim(), packed: false })
+    await mutate('car_cargo.insert', supabase.from('car_cargo').insert({ car_id: carId, item: item.trim(), packed: false }))
     setItem('')
     setAdding(false)
   }
