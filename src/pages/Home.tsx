@@ -26,9 +26,10 @@ type SheetMode = 'event' | 'crew' | null
 
 export default function Home() {
   const navigate = useNavigate()
-  const { summaries, loading: loadingRooms } = useMyRooms()
-  const { summaries: crews, loading: loadingCrews } = useMyCrews()
+  const { summaries, isLoading: loadingRooms, error: roomsError } = useMyRooms()
+  const { summaries: crews, isLoading: loadingCrews, error: crewsError } = useMyCrews()
   const myName = getMyName()
+  const loadError = roomsError ?? crewsError
 
   const [sheet, setSheet] = useState<SheetMode>(null)
   const [title, setTitle] = useState('')
@@ -46,7 +47,9 @@ export default function Home() {
   const closedRooms = standalone.filter((s) => s.room.status === 'closed')
 
   const loading = loadingRooms || loadingCrews
-  const showOnboarding = !loading && summaries.length === 0 && crews.length === 0
+  // Con un errore di lettura NON mostriamo l'onboarding (che equivarrebbe a
+  // dire "non hai nulla"): mostriamo lo stato d'errore nella lista.
+  const showOnboarding = !loading && !loadError && summaries.length === 0 && crews.length === 0
 
   async function submitSheet(e: FormEvent) {
     e.preventDefault()
@@ -182,6 +185,15 @@ export default function Home() {
 
           <div className="flex-1 space-y-5 px-4 pb-28 sm:px-6">
             {error && !sheet && <p className="rounded-xl bg-coral/10 px-4 py-2 text-sm text-coral">{error}</p>}
+
+            {loadError && (
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-coral/10 px-4 py-2.5">
+                <p className="text-sm text-coral">Errore nel caricamento dei tuoi eventi.</p>
+                <button onClick={() => window.location.reload()} className="shrink-0 text-sm text-cream underline">
+                  Riprova
+                </button>
+              </div>
+            )}
 
             {crewsSection}
 

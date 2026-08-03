@@ -39,7 +39,8 @@ export default function RoomPage() {
   }, [roomId, navigate])
 
   const {
-    loading,
+    isLoading,
+    error,
     room,
     members,
     cars,
@@ -58,8 +59,21 @@ export default function RoomPage() {
     rideRequests,
   } = useRoomData(checkedMembership ? roomId : undefined)
 
-  if (!checkedMembership || loading) {
+  if (!checkedMembership || isLoading) {
     return <div className="flex min-h-svh items-center justify-center bg-ink text-muted">Caricamento...</div>
+  }
+
+  // Errore di lettura (es. tabella mancante) ≠ stanza inesistente: stato distinto.
+  if (error) {
+    return (
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
+        <p className="text-coral">Errore nel caricamento della stanza.</p>
+        <p className="font-mono text-[11px] text-muted">{error.message}</p>
+        <button onClick={() => window.location.reload()} className="text-sm text-cream underline">
+          Riprova
+        </button>
+      </div>
+    )
   }
 
   if (!room) {

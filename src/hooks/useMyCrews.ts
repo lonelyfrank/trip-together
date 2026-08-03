@@ -1,4 +1,6 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
+import { query, rows } from '../lib/db'
 import { getSavedCrews } from '../lib/localRooms'
 import { supabase } from '../lib/supabase'
 import type { Crew } from '../types'
@@ -11,7 +13,8 @@ export interface CrewSummary {
 
 export function useMyCrews() {
   const [summaries, setSummaries] = useState<CrewSummary[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<PostgrestError | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -21,29 +24,45 @@ export function useMyCrews() {
       if (entries.length === 0) {
         if (!cancelled) {
           setSummaries([])
-          setLoading(false)
+          setError(null)
+          setIsLoading(false)
         }
         return
       }
 
       const crewIds = entries.map((e) => e.crewId)
-      const [crewsRes, membersRes, roomsRes] = await Promise.all([
-        supabase.from('crews').select('*').in('id', crewIds),
-        supabase.from('crew_members').select('id, crew_id').in('crew_id', crewIds),
-        supabase.from('rooms').select('id, crew_id').in('crew_id', crewIds),
+      const [crewsQ, membersQ, roomsQ] = await Promise.all([
+        query<Crew[]>('crews.mine', supabase.from('crews').select('*').in('id', crewIds)),
+        query<{ id: string; crew_id: string }[]>(
+          'crew_members.mine',
+          supabase.from('crew_members').select('id, crew_id').in('crew_id', crewIds),
+        ),
+        query<{ id: string; crew_id: string }[]>(
+          'rooms.byCrews',
+          supabase.from('rooms').select('id, crew_id').in('crew_id', crewIds),
+        ),
       ])
       if (cancelled) return
 
-      const results: CrewSummary[] = (crewsRes.data ?? [])
-        .map((crew: Crew) => ({
+      if (crewsQ.kind === 'fail') {
+        setError(crewsQ.error)
+        setIsLoading(false)
+        return
+      }
+
+      const members = rows(membersQ)
+      const events = rows(roomsQ)
+      const results: CrewSummary[] = rows(crewsQ)
+        .map((crew) => ({
           crew,
-          memberCount: (membersRes.data ?? []).filter((m) => m.crew_id === crew.id).length,
-          eventCount: (roomsRes.data ?? []).filter((r) => r.crew_id === crew.id).length,
+          memberCount: members.filter((m) => m.crew_id === crew.id).length,
+          eventCount: events.filter((r) => r.crew_id === crew.id).length,
         }))
         .sort((a, b) => (a.crew.created_at < b.crew.created_at ? 1 : -1))
 
       setSummaries(results)
-      setLoading(false)
+      setError(null)
+      setIsLoading(false)
     }
 
     load()
@@ -52,5 +71,5 @@ export function useMyCrews() {
     }
   }, [])
 
-  return { summaries, loading }
+  return { summaries, isLoading, error }
 }

@@ -1,33 +1,48 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState } from 'react'
+import { firstError, query, rows, single } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import type { Crew, CrewMember, Room } from '../types'
 
 interface CrewData {
-  loading: boolean
+  isLoading: boolean
+  error: PostgrestError | null
   notFound: boolean
   crew: Crew | null
   members: CrewMember[]
   events: Room[]
 }
 
-const EMPTY: CrewData = { loading: true, notFound: false, crew: null, members: [], events: [] }
+const EMPTY: CrewData = {
+  isLoading: true,
+  error: null,
+  notFound: false,
+  crew: null,
+  members: [],
+  events: [],
+}
 
 export function useCrewData(crewId: string | undefined) {
   const [data, setData] = useState<CrewData>(EMPTY)
 
   const loadAll = useCallback(async (id: string) => {
-    const [crewRes, membersRes, eventsRes] = await Promise.all([
-      supabase.from('crews').select('*').eq('id', id).maybeSingle(),
-      supabase.from('crew_members').select('*').eq('crew_id', id),
-      supabase.from('rooms').select('*').eq('crew_id', id).order('created_at', { ascending: false }),
+    const [crewQ, membersQ, eventsQ] = await Promise.all([
+      query<Crew>('crews.byId', supabase.from('crews').select('*').eq('id', id).maybeSingle()),
+      query<CrewMember[]>('crew_members.byCrew', supabase.from('crew_members').select('*').eq('crew_id', id)),
+      query<Room[]>(
+        'rooms.byCrew',
+        supabase.from('rooms').select('*').eq('crew_id', id).order('created_at', { ascending: false }),
+      ),
     ])
 
+    const error = firstError(crewQ, membersQ, eventsQ)
     setData({
-      loading: false,
-      notFound: !crewRes.data,
-      crew: crewRes.data ?? null,
-      members: membersRes.data ?? [],
-      events: eventsRes.data ?? [],
+      isLoading: false,
+      error,
+      notFound: !error && crewQ.kind === 'empty',
+      crew: single(crewQ),
+      members: rows(membersQ),
+      events: rows(eventsQ),
     })
   }, [])
 

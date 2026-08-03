@@ -24,7 +24,7 @@ function formatEventTime(iso: string): string {
 export default function CrewPage() {
   const { crewId } = useParams<{ crewId: string }>()
   const navigate = useNavigate()
-  const { loading, notFound, crew, members, events } = useCrewData(crewId)
+  const { isLoading, error: loadError, notFound, crew, members, events } = useCrewData(crewId)
 
   const [creating, setCreating] = useState(false)
   const [title, setTitle] = useState('')
@@ -34,8 +34,20 @@ export default function CrewPage() {
 
   const entry = crewId ? getSavedCrewEntry(crewId) : null
 
-  if (loading) {
+  if (isLoading) {
     return <div className="flex min-h-svh items-center justify-center bg-ink text-muted">Caricamento...</div>
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
+        <p className="text-coral">Errore nel caricamento della comitiva.</p>
+        <p className="font-mono text-[11px] text-muted">{loadError.message}</p>
+        <button onClick={() => window.location.reload()} className="text-sm text-cream underline">
+          Riprova
+        </button>
+      </div>
+    )
   }
 
   if (notFound || !crew || !entry) {

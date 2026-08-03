@@ -1,4 +1,6 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
+import { query, rows } from '../lib/db'
 import { getSavedRooms } from '../lib/localRooms'
 import { supabase } from '../lib/supabase'
 import type { Room } from '../types'
@@ -15,58 +17,78 @@ const RADAR_ACTIVE_WINDOW_MS = 5 * 60_000
 
 export function useMyRooms() {
   const [summaries, setSummaries] = useState<RoomSummary[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<PostgrestError | null>(null)
 
   async function reload() {
     const entries = getSavedRooms()
     if (entries.length === 0) {
       setSummaries([])
-      setLoading(false)
+      setError(null)
+      setIsLoading(false)
       return
     }
 
     const roomIds = entries.map((e) => e.roomId)
     const cutoff = new Date(Date.now() - RADAR_ACTIVE_WINDOW_MS).toISOString()
 
-    const [roomsRes, membersRes, carExpensesRes, generalExpensesRes, radarRes] = await Promise.all([
-      supabase.from('rooms').select('*').in('id', roomIds),
-      supabase.from('members').select('id, room_id').in('room_id', roomIds),
-      supabase.from('car_expenses').select('car_id, cars!inner(room_id)').in('cars.room_id', roomIds),
-      supabase.from('general_expenses').select('room_id, waived').in('room_id', roomIds),
-      supabase.from('radar_positions').select('room_id, updated_at').in('room_id', roomIds).gt('updated_at', cutoff),
+    const [roomsQ, membersQ, carExpensesQ, generalExpensesQ, radarQ] = await Promise.all([
+      query<Room[]>('rooms.mine', supabase.from('rooms').select('*').in('id', roomIds)),
+      query<{ id: string; room_id: string }[]>(
+        'members.mine',
+        supabase.from('members').select('id, room_id').in('room_id', roomIds),
+      ),
+      // any: l'embed cars!inner è tipizzato come array da supabase-js, ma a runtime
+      // (to-one) è un oggetto; si legge e.cars.room_id come nell'implementazione originale.
+      query<any[]>(
+        'car_expenses.mine',
+        supabase.from('car_expenses').select('car_id, cars!inner(room_id)').in('cars.room_id', roomIds),
+      ),
+      query<{ room_id: string; waived: boolean }[]>(
+        'general_expenses.mine',
+        supabase.from('general_expenses').select('room_id, waived').in('room_id', roomIds),
+      ),
+      query<{ room_id: string; updated_at: string }[]>(
+        'radar_positions.mine',
+        supabase.from('radar_positions').select('room_id, updated_at').in('room_id', roomIds).gt('updated_at', cutoff),
+      ),
     ])
 
-    const roomIdsWithCarExpenses = new Set(
-      (carExpensesRes.data ?? []).map((e: any) => e.cars.room_id as string),
-    )
+    // La lista in sé è quella delle stanze: un suo errore è lo stato d'errore
+    // dell'hook; le query di arricchimento degradano silenziose (già loggate).
+    if (roomsQ.kind === 'fail') {
+      setError(roomsQ.error)
+      setIsLoading(false)
+      return
+    }
 
-    const results: RoomSummary[] = (roomsRes.data ?? [])
-      .map((room: Room) => {
+    const roomIdsWithCarExpenses = new Set(rows(carExpensesQ).map((e) => e.cars.room_id))
+    const members = rows(membersQ)
+    const generalExpenses = rows(generalExpensesQ)
+    const radar = rows(radarQ)
+
+    const results: RoomSummary[] = rows(roomsQ)
+      .map((room) => {
         const entry = entries.find((e) => e.roomId === room.id)!
-        const memberCount = (membersRes.data ?? []).filter((m) => m.room_id === room.id).length
-        const hasOpenGeneralExpense = (generalExpensesRes.data ?? []).some(
-          (e) => e.room_id === room.id && !e.waived,
-        )
-        const hasCarExpenseActivity = roomIdsWithCarExpenses.has(room.id)
-        const radarActive = (radarRes.data ?? []).some((r) => r.room_id === room.id)
-
         return {
           room,
           memberId: entry.memberId,
-          memberCount,
-          openBalance: hasOpenGeneralExpense || hasCarExpenseActivity,
-          radarActive,
+          memberCount: members.filter((m) => m.room_id === room.id).length,
+          openBalance:
+            generalExpenses.some((e) => e.room_id === room.id && !e.waived) || roomIdsWithCarExpenses.has(room.id),
+          radarActive: radar.some((r) => r.room_id === room.id),
         }
       })
       .sort((a, b) => (a.room.created_at < b.room.created_at ? 1 : -1))
 
     setSummaries(results)
-    setLoading(false)
+    setError(null)
+    setIsLoading(false)
   }
 
   useEffect(() => {
     reload()
   }, [])
 
-  return { summaries, loading }
+  return { summaries, isLoading, error }
 }

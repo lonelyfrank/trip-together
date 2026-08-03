@@ -1,4 +1,6 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState } from 'react'
+import { firstError, query, rows, single } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import type {
   BoardLink,
@@ -20,7 +22,8 @@ import type {
 } from '../types'
 
 interface RoomData {
-  loading: boolean
+  isLoading: boolean
+  error: PostgrestError | null
   room: Room | null
   members: Member[]
   cars: Car[]
@@ -40,7 +43,8 @@ interface RoomData {
 }
 
 const EMPTY: RoomData = {
-  loading: true,
+  isLoading: true,
+  error: null,
   room: null,
   members: [],
   cars: [],
@@ -64,65 +68,101 @@ export function useRoomData(roomId: string | undefined) {
 
   const loadAll = useCallback(async (id: string) => {
     const [
-      roomRes,
-      membersRes,
-      carsRes,
-      carPassengersRes,
-      carExpensesRes,
-      carCargoRes,
-      delayReportsRes,
-      generalExpensesRes,
-      generalExpenseParticipantsRes,
-      boardNotesRes,
-      boardLinksRes,
-      radarRes,
-      roomChecklistRes,
-      stopProposalsRes,
-      stopProposalVotesRes,
-      rideRequestsRes,
+      roomQ,
+      membersQ,
+      carsQ,
+      carPassengersQ,
+      carExpensesQ,
+      carCargoQ,
+      delayReportsQ,
+      generalExpensesQ,
+      generalExpenseParticipantsQ,
+      boardNotesQ,
+      boardLinksQ,
+      radarQ,
+      roomChecklistQ,
+      stopProposalsQ,
+      stopProposalVotesQ,
+      rideRequestsQ,
     ] = await Promise.all([
-      supabase.from('rooms').select('*').eq('id', id).maybeSingle(),
-      supabase.from('members').select('*').eq('room_id', id),
-      supabase.from('cars').select('*').eq('room_id', id),
-      supabase.from('car_passengers').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-      supabase.from('car_expenses').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-      supabase.from('car_cargo').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-      supabase.from('delay_reports').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-      supabase.from('general_expenses').select('*').eq('room_id', id),
-      supabase
-        .from('general_expense_participants')
-        .select('*, general_expenses!inner(room_id)')
-        .eq('general_expenses.room_id', id),
-      supabase.from('board_notes').select('*').eq('room_id', id),
-      supabase.from('board_links').select('*').eq('room_id', id),
-      supabase.from('radar_positions').select('*').eq('room_id', id),
-      supabase.from('room_checklist_items').select('*').eq('room_id', id),
-      supabase.from('stop_proposals').select('*').eq('room_id', id),
-      supabase
-        .from('stop_proposal_votes')
-        .select('*, stop_proposals!inner(room_id)')
-        .eq('stop_proposals.room_id', id),
-      supabase.from('ride_requests').select('*').eq('room_id', id),
+      query<Room>('rooms.byId', supabase.from('rooms').select('*').eq('id', id).maybeSingle()),
+      query<Member[]>('members.byRoom', supabase.from('members').select('*').eq('room_id', id)),
+      query<Car[]>('cars.byRoom', supabase.from('cars').select('*').eq('room_id', id)),
+      query<CarPassenger[]>(
+        'car_passengers.byRoom',
+        supabase.from('car_passengers').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      ),
+      query<CarExpense[]>(
+        'car_expenses.byRoom',
+        supabase.from('car_expenses').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      ),
+      query<CarCargoItem[]>(
+        'car_cargo.byRoom',
+        supabase.from('car_cargo').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      ),
+      query<DelayReport[]>(
+        'delay_reports.byRoom',
+        supabase.from('delay_reports').select('*, cars!inner(room_id)').eq('cars.room_id', id),
+      ),
+      query<GeneralExpense[]>('general_expenses.byRoom', supabase.from('general_expenses').select('*').eq('room_id', id)),
+      query<GeneralExpenseParticipant[]>(
+        'general_expense_participants.byRoom',
+        supabase
+          .from('general_expense_participants')
+          .select('*, general_expenses!inner(room_id)')
+          .eq('general_expenses.room_id', id),
+      ),
+      query<BoardNote[]>('board_notes.byRoom', supabase.from('board_notes').select('*').eq('room_id', id)),
+      query<BoardLink[]>('board_links.byRoom', supabase.from('board_links').select('*').eq('room_id', id)),
+      query<RadarPosition[]>('radar_positions.byRoom', supabase.from('radar_positions').select('*').eq('room_id', id)),
+      query<RoomChecklistItem[]>(
+        'room_checklist_items.byRoom',
+        supabase.from('room_checklist_items').select('*').eq('room_id', id),
+      ),
+      query<StopProposal[]>('stop_proposals.byRoom', supabase.from('stop_proposals').select('*').eq('room_id', id)),
+      query<StopProposalVote[]>(
+        'stop_proposal_votes.byRoom',
+        supabase.from('stop_proposal_votes').select('*, stop_proposals!inner(room_id)').eq('stop_proposals.room_id', id),
+      ),
+      query<RideRequest[]>('ride_requests.byRoom', supabase.from('ride_requests').select('*').eq('room_id', id)),
     ])
 
     setData({
-      loading: false,
-      room: roomRes.data ?? null,
-      members: membersRes.data ?? [],
-      cars: carsRes.data ?? [],
-      carPassengers: carPassengersRes.data ?? [],
-      carExpenses: carExpensesRes.data ?? [],
-      carCargo: carCargoRes.data ?? [],
-      delayReports: delayReportsRes.data ?? [],
-      generalExpenses: generalExpensesRes.data ?? [],
-      generalExpenseParticipants: generalExpenseParticipantsRes.data ?? [],
-      boardNotes: boardNotesRes.data ?? [],
-      boardLinks: boardLinksRes.data ?? [],
-      radarPositions: radarRes.data ?? [],
-      roomChecklistItems: roomChecklistRes.data ?? [],
-      stopProposals: stopProposalsRes.data ?? [],
-      stopProposalVotes: stopProposalVotesRes.data ?? [],
-      rideRequests: rideRequestsRes.data ?? [],
+      isLoading: false,
+      error: firstError(
+        roomQ,
+        membersQ,
+        carsQ,
+        carPassengersQ,
+        carExpensesQ,
+        carCargoQ,
+        delayReportsQ,
+        generalExpensesQ,
+        generalExpenseParticipantsQ,
+        boardNotesQ,
+        boardLinksQ,
+        radarQ,
+        roomChecklistQ,
+        stopProposalsQ,
+        stopProposalVotesQ,
+        rideRequestsQ,
+      ),
+      room: single(roomQ),
+      members: rows(membersQ),
+      cars: rows(carsQ),
+      carPassengers: rows(carPassengersQ),
+      carExpenses: rows(carExpensesQ),
+      carCargo: rows(carCargoQ),
+      delayReports: rows(delayReportsQ),
+      generalExpenses: rows(generalExpensesQ),
+      generalExpenseParticipants: rows(generalExpenseParticipantsQ),
+      boardNotes: rows(boardNotesQ),
+      boardLinks: rows(boardLinksQ),
+      radarPositions: rows(radarQ),
+      roomChecklistItems: rows(roomChecklistQ),
+      stopProposals: rows(stopProposalsQ),
+      stopProposalVotes: rows(stopProposalVotesQ),
+      rideRequests: rows(rideRequestsQ),
     })
   }, [])
 
