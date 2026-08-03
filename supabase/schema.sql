@@ -6,6 +6,8 @@
 create extension if not exists pgcrypto;
 
 -- ─── drop (ordine inverso alle dipendenze) ─────────────────────────────
+drop table if exists crew_members cascade;
+drop table if exists crews cascade;
 drop table if exists radar_positions cascade;
 drop table if exists room_checklist_items cascade;
 drop table if exists ride_requests cascade;
@@ -23,11 +25,31 @@ drop table if exists cars cascade;
 drop table if exists members cascade;
 drop table if exists rooms cascade;
 
--- ─── stanze ─────────────────────────────────────────────────────────────
+-- ─── comitive (gruppi persistenti che contengono più eventi) ───────────
+create table crews (
+  id uuid primary key default gen_random_uuid(),
+  invite_code text unique not null,
+  name text not null,
+  created_by uuid not null,
+  created_at timestamptz default now()
+);
+
+create table crew_members (
+  id uuid primary key default gen_random_uuid(),
+  crew_id uuid references crews(id) on delete cascade,
+  display_name text not null,
+  auth_user_id uuid,
+  role text not null default 'member', -- 'creator' | 'member'
+  created_at timestamptz default now(),
+  unique (crew_id, auth_user_id)
+);
+
+-- ─── stanze/eventi (crew_id null = evento rapido standalone) ────────────
 create table rooms (
   id uuid primary key default gen_random_uuid(),
   invite_code text unique not null,
   title text not null,
+  crew_id uuid references crews(id) on delete set null,
   destination_label text,
   destination_lat float8,
   destination_lng float8,
@@ -179,6 +201,8 @@ create table radar_positions (
   updated_at timestamptz default now()
 );
 
+create index idx_crew_members_crew on crew_members(crew_id);
+create index idx_rooms_crew on rooms(crew_id);
 create index idx_members_room on members(room_id);
 create index idx_cars_room on cars(room_id);
 create index idx_car_passengers_car on car_passengers(car_id);
@@ -200,6 +224,8 @@ create index idx_radar_room on radar_positions(room_id);
 -- (via link/codice) può leggere/scrivere. Nessun controllo di appartenenza
 -- reale a livello DB — da stringere prima che i dati contino davvero
 -- (token firmati, scoping per stanza, vedi sezione 14 dello spec).
+alter table crews enable row level security;
+alter table crew_members enable row level security;
 alter table rooms enable row level security;
 alter table members enable row level security;
 alter table cars enable row level security;
@@ -217,6 +243,8 @@ alter table stop_proposals enable row level security;
 alter table stop_proposal_votes enable row level security;
 alter table ride_requests enable row level security;
 
+create policy "crews: all" on crews for all using (true) with check (true);
+create policy "crew_members: all" on crew_members for all using (true) with check (true);
 create policy "rooms: all" on rooms for all using (true) with check (true);
 create policy "members: all" on members for all using (true) with check (true);
 create policy "cars: all" on cars for all using (true) with check (true);
@@ -295,6 +323,8 @@ with check (
 );
 
 -- ─── Realtime ───────────────────────────────────────────────────────────
+alter publication supabase_realtime add table crews;
+alter publication supabase_realtime add table crew_members;
 alter publication supabase_realtime add table rooms;
 alter publication supabase_realtime add table members;
 alter publication supabase_realtime add table cars;

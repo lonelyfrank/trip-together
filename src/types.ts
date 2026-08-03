@@ -1,10 +1,29 @@
 export type RoomStatus = 'open' | 'closed'
 export type MemberRole = 'creator' | 'guest'
+export type CrewMemberRole = 'creator' | 'member'
+
+export interface Crew {
+  id: string
+  invite_code: string
+  name: string
+  created_by: string
+  created_at: string
+}
+
+export interface CrewMember {
+  id: string
+  crew_id: string
+  display_name: string
+  auth_user_id: string | null
+  role: CrewMemberRole
+  created_at: string
+}
 
 export interface Room {
   id: string
   invite_code: string
   title: string
+  crew_id: string | null
   destination_label: string | null
   destination_lat: number | null
   destination_lng: number | null

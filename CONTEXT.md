@@ -7,7 +7,13 @@ Demo di validazione (Vite + React + TypeScript + Supabase). Vedi [README.md](REA
 - **Niente chat libera in nessuna tab.** Ogni campo testo deve restare corto/opzionale (nota, titolo, causale predefinita) — mai un textarea libero senza limite che diventi un thread di messaggi.
 - **Radar mai automatico.** Attivazione sempre esplicita (toggle), mai attivo di default all'ingresso in stanza.
 - **Ogni auto è una mini-stanza indipendente.** Spese e carico di un'auto non si mescolano mai con quelli di un'altra auto.
-- **Nessun account/login.** Identità via sessione anonima Supabase (`supabase.auth.signInAnonymously()`), persistita in `localStorage` (vedi `src/lib/localRooms.ts`).
+- **Nessun account/login.** Identità via sessione anonima Supabase (`ensureAnonymousSession()` in `src/lib/supabase.ts`). Il device ricorda in `localStorage` a quali **stanze** e **comitive** appartiene e con quale id-membro (`src/lib/localRooms.ts`: `saveRoomEntry`/`saveCrewEntry`).
+
+## Comitive vs eventi (modello portante)
+
+- Una **comitiva** (`crews`) è un gruppo **persistente** con partecipanti stabili (`crew_members`) e un proprio codice invito. Al suo interno si organizzano più **eventi**.
+- Un **evento/stanza** (`rooms`) può appartenere a una comitiva (`rooms.crew_id`) oppure essere un **evento rapido** standalone (`crew_id` null).
+- I workflow di creazione/ingresso stanno tutti in `src/lib/membership.ts`: `createRoomAndJoin(title, name, crewId?)`, `joinRoomAsMember`, `createCrew`, `joinCrewAsMember`, `resolveInviteCode` (capisce se un codice è di una stanza o di una comitiva). Le pagine (Home/Join/Crew) non duplicano questa logica.
 
 ## Palette "obsidian" (dark, unica — nessun light mode)
 
@@ -36,27 +42,44 @@ Font (Google Fonts, caricati in `index.html`): tutto Roboto. `font-sans` = Robot
 - **`Chip`** — pillola di stato, tone: `muted | amber | teal | alert`.
 - **`Card`** — card `rounded-[20px]`, tone: `surface | highlight | flat | dashed`; passa `onClick` per renderla tappabile (`active:scale-[0.98]` automatico).
 - **`Button`** — variant: `primary | teal | outline | surface`, size: `md | sm`.
-- **`BottomSheet`** — foglio che scorre dal basso (usato da `MapSheet` e da qualunque nuova azione con opzioni multiple): non introdurre un nuovo pattern di overlay, riusare questo.
+- **`BottomSheet`** — foglio che scorre dal basso (usato da `MapSheet`, dai form di creazione, dai picker come `TravelStatusChip`): non introdurre un nuovo pattern di overlay, riusare questo.
 - **`TabBar`** (in `src/components/`) — tab Stanza/Auto/Bacheca/Spese/Radar con indicatore che scorre.
+
+Componenti di dominio in `src/components/room/`: `DestinationCard` (destinazione + `EventTimeRow` per data/ora con salvataggio separato + `WeatherStrip` meteo Open-Meteo), `StanzaTab`/`AutoTab`/`BachecaTab`/`SpeseTab`/`RadarTab`, `TravelStatusChip`, `DelayReportBadge`, `ChecklistSection`, `StopProposalsSection`/`StopProposalCard`, `RideRequestsSection`, `ReadinessBanner`, `CloseRoomSection`.
+
+Utility in `src/lib/`: `mapLinks` (parse coordinate da link Google/Apple Maps/Waze), `weather` (Open-Meteo, no API key), `balances` (netting spese), `proposals`, `readiness`, `geo`, `time`, `eventTint`, `roomCode`, `membership`, `localRooms`.
 
 Nessun nuovo pattern visivo (card, bottone, sheet) senza necessità reale — riusare quanto sopra.
 
 ## Schema Supabase attuale (nomi reali — verificare sempre prima di aggiungere migration)
 
-Definito in `supabase/schema.sql`. Nomi tabella/colonna effettivi (attenzione: non "room", "room_members", "car_members", "expenses" — quei nomi non esistono in questo progetto):
+Schema completo in `supabase/schema.sql` (installazione da zero, distruttiva). Attenzione ai nomi reali: non "room", "room_members", "car_members", "expenses". Tabelle/colonne:
 
-- `rooms` (non `room`): `id, invite_code, title, destination_label, destination_lat, destination_lng, status, created_by, created_at`
-- `members` (non `room_members`): `id, room_id, display_name, auth_user_id, role ('creator'|'guest'), created_at`
-- `cars`: `id, room_id, driver_member_id, seats_total, created_at`
+- `crews`: `id, invite_code, name, created_by, created_at`
+- `crew_members`: `id, crew_id, display_name, auth_user_id, role ('creator'|'member'), created_at` (unique `crew_id, auth_user_id`)
+- `rooms` (non `room`): `id, invite_code, title, crew_id (null=standalone), destination_label, destination_lat, destination_lng, event_time, status, created_by, created_at`
+- `members` (non `room_members`): `id, room_id, display_name, auth_user_id, role ('creator'|'guest'), confirmed, confirmed_at, created_at`
+- `cars`: `id, room_id, driver_member_id, seats_total, travel_status ('non_partita'|'in_partenza'|'in_viaggio'|'fermo'|'arrivata'), travel_status_updated_at, travel_status_updated_by, created_at`
 - `car_passengers` (non `car_members`): `id, car_id, member_id` (unique su `member_id`: un membro sta in una sola auto)
 - `car_expenses`: `id, car_id, label, amount, paid_by_member_id`
 - `car_cargo`: `id, car_id, item, packed`
+- `delay_reports`: `id, car_id, reason, minutes_estimate, reported_by, created_at, resolved_at`
 - `general_expenses` (non `expenses`): `id, room_id, label, amount, paid_by_member_id, waived, waived_by_member_id, created_at`
 - `general_expense_participants`: `id, expense_id, member_id`
 - `board_notes`: `id, room_id, text, pinned, created_at`
 - `board_links`: `id, room_id, label, url`
+- `room_checklist_items`: `id, room_id, title, assigned_to, status ('da_portare'|'portato'), created_by, created_at`
+- `stop_proposals`: `id, room_id, car_id (null=tutta la stanza), proposed_by, type, note, status, created_at, expires_at`
+- `stop_proposal_votes`: `proposal_id, member_id (pk composita), vote, voted_at`
+- `ride_requests`: `id, room_id, member_id, status ('pending'|'matched'|'cancelled'), created_at, matched_car_id`
 - `radar_positions`: `member_id (pk), room_id, lat, lng, updated_at` — mai storicizzata, sempre sovrascritta
 
-RLS attuale sulle tabelle esistenti: permissiva (`using (true)`), perché l'accesso è comunque scoped dall'unguessable `invite_code`/`id` in questa fase di validazione. Le **nuove** tabelle vanno invece scoped ai membri della stanza tramite `auth.uid()` = `members.auth_user_id`, coerentemente con quanto richiesto per le nuove funzionalità.
+RLS: **permissiva** (`using (true) with check (true)`) su tutte le tabelle in questa fase di validazione — l'accesso è comunque scoped dall'`invite_code`/`id` non indovinabile. (Nota: alcuni file migration 002–005 avevano policy scoped via `auth.uid()`, ma lo script effettivo `supabase/CATCH_UP.sql` le rende permissive per coerenza e per ridurre attriti in demo.) Realtime abilitato su tutte le tabelle.
 
-Realtime abilitato su tutte le tabelle sopra. Il hook `src/hooks/useRoomData.ts` centralizza fetch + sottoscrizioni realtime per una stanza; le tabelle senza `room_id` diretto (es. `car_expenses`, `car_cargo`, `car_passengers`) vengono ricaricate per intero ad ogni evento invece di essere filtrate lato realtime — scelta deliberata per semplicità alla scala di un gruppo di amici.
+**Stato del DB vivo ≠ schema.sql.** Sul progetto reale spesso è applicato solo lo schema base: le feature 001→007 vanno lanciate a mano con `supabase/CATCH_UP.sql` (unico script idempotente, non distruttivo). Vedi la memory `db-migrations-manual`. Il codice degrada senza crashare quando una tabella manca (le query supabase-js risolvono con `{data:null}`), quindi controllare sempre lo stato reale con `curl` sull'endpoint REST prima di dare per scontata una tabella.
+
+Il hook `src/hooks/useRoomData.ts` centralizza fetch + sottoscrizioni realtime per una stanza; le tabelle senza `room_id` diretto (`car_expenses`, `car_cargo`, `car_passengers`, `delay_reports`, `stop_proposal_votes`) vengono ricaricate per intero ad ogni evento. Analoghi: `useCrewData` (una comitiva + membri + suoi eventi), `useMyRooms`/`useMyCrews` (liste per la Home).
+
+## Route
+
+`/` (Home: onboarding a 3 scelte se vuoto, altrimenti liste), `/join/:inviteCode` (risolve stanza o comitiva), `/crew/:crewId`, `/room/:roomId`.
