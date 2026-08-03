@@ -1,7 +1,9 @@
--- Trip Together — schema esteso (mare/montagna/festival/concerto)
--- Sostituisce integralmente lo schema MVP precedente: DROP + ricrea da zero
--- (nessun dato di test da preservare). Esegui in Supabase → SQL Editor.
--- Richiede Authentication → Providers → Anonymous sign-ins abilitato.
+-- ⚠️ FILE GENERATO — NON MODIFICARE A MANO.
+-- La fonte di verità dello schema sono le migration in `supabase/migrations/`.
+-- Rigenera questo snapshot con:  supabase db dump -f supabase/schema.sql
+-- (serve solo come istantanea leggibile; per applicare lo schema usa
+--  `supabase db push`, vedi supabase/README.md). Snapshot manuale sotto,
+-- da sostituire al primo dump reale.
 
 create extension if not exists pgcrypto;
 

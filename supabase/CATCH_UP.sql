@@ -1,12 +1,12 @@
 -- ═══════════════════════════════════════════════════════════════════════
--- Trip Together — script di allineamento (esegui UNA volta su Supabase → SQL Editor)
+-- ⚠️ DEPRECATO — usa la Supabase CLI: `supabase db push` (vedi supabase/README.md).
+-- La fonte di verità sono ora le migration in supabase/migrations/.
+-- Questo script resta SOLO come fallback manuale (SQL Editor) per chi non ha la
+-- CLI, finché il flusso `db push` non è verificato in produzione. Poi va rimosso.
 --
--- Applica in un colpo solo tutte le migration delle feature (001→007) che non
--- risultano ancora sul database. È idempotente e NON distruttivo: puoi rieseguirlo
--- senza errori e senza perdere dati (usa "if not exists" / "drop policy if exists").
---
--- Policy demo-grade: permissive (accesso via codice/id non indovinabile), come le
--- altre tabelle già presenti. Da stringere prima della fase con dati reali.
+-- Trip Together — script di allineamento (esegui UNA volta su Supabase → SQL Editor).
+-- Applica le feature migration mancanti. Idempotente e NON distruttivo.
+-- Policy demo-grade permissive, coerenti con le migration.
 -- ═══════════════════════════════════════════════════════════════════════
 
 -- ─── 001 · stato di viaggio per auto ───────────────────────────────────
