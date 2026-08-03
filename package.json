@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "lint": "oxlint",
     "check": "npm run typecheck && npm run lint",
+    "db:check": "node scripts/dbCheck.ts",
     "preview": "vite preview"
   },
   "dependencies": {

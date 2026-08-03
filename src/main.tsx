@@ -7,6 +7,12 @@ import Home from './pages/Home'
 import Join from './pages/Join'
 import RoomPage from './pages/Room'
 
+// Osservabilità in DEV: segnala in console le tabelle attese ma assenti sul DB.
+// Import dinamico così il codice non finisce nel bundle di produzione.
+if (import.meta.env.DEV) {
+  import('./lib/schemaCheck').then((m) => m.checkSchema())
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
