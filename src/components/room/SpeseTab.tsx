@@ -3,8 +3,9 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { computeBalances, computeTransfers } from '../../lib/balances'
-import { mutate } from '../../lib/db'
+import { mutateNotify } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member } from '../../types'
 
@@ -35,6 +36,7 @@ export default function SpeseTab({
   const [paidBy, setPaidBy] = useState(currentMember.id)
   const [participantIds, setParticipantIds] = useState<string[]>(members.map((m) => m.id))
   const [saving, setSaving] = useState(false)
+  const optimistic = useRoomOptimistic(roomId)
 
   const memberById = (id: string) => members.find((m) => m.id === id)
   const isCreator = currentMember.role === 'creator'
@@ -50,13 +52,18 @@ export default function SpeseTab({
     setParticipantIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
   }
 
-  async function waiveExpense(expenseId: string) {
-    await mutate(
+  function waiveExpense(expenseId: string) {
+    optimistic(
       'general_expenses.waive',
-      supabase
-        .from('general_expenses')
-        .update({ waived: true, waived_by_member_id: currentMember.id })
-        .eq('id', expenseId),
+      (prev) => ({
+        ...prev,
+        generalExpenses: prev.generalExpenses.map((e) =>
+          e.id === expenseId ? { ...e, waived: true, waived_by_member_id: currentMember.id } : e,
+        ),
+      }),
+      () =>
+        supabase.from('general_expenses').update({ waived: true, waived_by_member_id: currentMember.id }).eq('id', expenseId),
+      'Condono non salvato.',
     )
   }
 
@@ -66,21 +73,23 @@ export default function SpeseTab({
     if (!label.trim() || !value || participantIds.length === 0) return
     setSaving(true)
     try {
-      const { data: expense, error } = await mutate<{ id: string }>(
+      const { data: expense, error } = await mutateNotify<{ id: string }>(
         'general_expenses.insert',
         supabase
           .from('general_expenses')
           .insert({ room_id: roomId, label: label.trim(), amount: value, paid_by_member_id: paidBy })
           .select()
           .single(),
+        'Spesa non salvata.',
       )
-      if (error || !expense) throw error ?? new Error('Inserimento spesa fallito')
+      if (error || !expense) return
 
-      await mutate(
+      await mutateNotify(
         'general_expense_participants.insert',
         supabase
           .from('general_expense_participants')
           .insert(participantIds.map((memberId) => ({ expense_id: expense.id, member_id: memberId }))),
+        'Partecipanti spesa non salvati.',
       )
 
       setLabel('')

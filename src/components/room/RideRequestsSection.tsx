@@ -1,7 +1,8 @@
 import { Hand } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
-import { mutate } from '../../lib/db'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
+import { mutateNotify } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Car, CarPassenger, Member, RideRequest } from '../../types'
 
@@ -24,6 +25,7 @@ export default function RideRequestsSection({
   rideRequests,
   amUnassigned,
 }: RideRequestsSectionProps) {
+  const optimistic = useRoomOptimistic(roomId)
   const memberById = (id: string) => members.find((m) => m.id === id)
   const pending = rideRequests.filter((r) => r.status === 'pending')
   const myRequest = pending.find((r) => r.member_id === currentMember.id)
@@ -34,32 +36,41 @@ export default function RideRequestsSection({
   )
 
   async function requestRide() {
-    await mutate(
+    await mutateNotify(
       'ride_requests.insert',
       supabase.from('ride_requests').insert({ room_id: roomId, member_id: currentMember.id }),
+      'Richiesta non inviata.',
     )
   }
 
-  async function cancelRequest() {
+  function cancelRequest() {
     if (!myRequest) return
-    await mutate(
+    const id = myRequest.id
+    optimistic(
       'ride_requests.cancel',
-      supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', myRequest.id),
+      (prev) => ({
+        ...prev,
+        rideRequests: prev.rideRequests.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r)),
+      }),
+      () => supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', id),
+      'Annullamento non riuscito.',
     )
   }
 
   async function offerSeat(request: RideRequest) {
     if (!myCarWithFreeSeat) return
-    await mutate(
+    await mutateNotify(
       'car_passengers.offerSeat',
       supabase.from('car_passengers').insert({ car_id: myCarWithFreeSeat.id, member_id: request.member_id }),
+      'Posto non offerto.',
     )
-    await mutate(
+    await mutateNotify(
       'ride_requests.match',
       supabase
         .from('ride_requests')
         .update({ status: 'matched', matched_car_id: myCarWithFreeSeat.id })
         .eq('id', request.id),
+      'Match non registrato.',
     )
   }
 

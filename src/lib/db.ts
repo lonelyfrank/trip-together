@@ -1,4 +1,5 @@
 import type { PostgrestError } from '@supabase/supabase-js'
+import { showToast } from './toast'
 
 // Wrapper unico per le query di lettura: restituisce un risultato esplicito a
 // TRE stati, così una tabella inesistente (fail) e una lista realmente vuota
@@ -54,4 +55,19 @@ export async function mutate<T = null>(
   const res = await builder
   if (res.error) console.error(`[db] ${label} — ${res.error.message}`)
   return { data: res.data ?? null, error: res.error }
+}
+
+/**
+ * Come mutate ma, in caso di errore, mostra anche un toast. Per le scritture non
+ * ottimistiche (tipicamente INSERT, dove l'optimistic creerebbe id temporanei in
+ * conflitto col realtime): l'utente riceve comunque feedback, non solo la console.
+ */
+export async function mutateNotify<T = null>(
+  label: string,
+  builder: PromiseLike<{ data?: T | null; error: PostgrestError | null }>,
+  errorMessage = 'Operazione non riuscita.',
+): Promise<{ data: T | null; error: PostgrestError | null }> {
+  const res = await mutate(label, builder)
+  if (res.error) showToast(errorMessage, 'error')
+  return res
 }

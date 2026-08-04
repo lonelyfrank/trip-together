@@ -4,7 +4,7 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
-import { mutate } from '../../lib/db'
+import { mutate, mutateNotify } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type {
   Car,
@@ -52,6 +52,7 @@ export default function AutoTab({
   const [addingCar, setAddingCar] = useState(false)
   const [seats, setSeats] = useState('4')
   const [savingCar, setSavingCar] = useState(false)
+  const optimistic = useRoomOptimistic(roomId)
 
   const memberById = (id: string) => members.find((m) => m.id === id)
   const currentCarId = carPassengers.find((cp) => cp.member_id === currentMember.id)?.car_id
@@ -66,9 +67,10 @@ export default function AutoTab({
     if (!total || total < 1) return
     setSavingCar(true)
     try {
-      await mutate(
+      await mutateNotify(
         'cars.insert',
         supabase.from('cars').insert({ room_id: roomId, driver_member_id: currentMember.id, seats_total: total }),
+        'Auto non creata.',
       )
       setSeats('4')
       setAddingCar(false)
@@ -77,26 +79,45 @@ export default function AutoTab({
     }
   }
 
-  async function removeCar(carId: string) {
-    await mutate('cars.delete', supabase.from('cars').delete().eq('id', carId))
+  function removeCar(carId: string) {
+    optimistic(
+      'cars.delete',
+      (prev) => ({
+        ...prev,
+        cars: prev.cars.filter((c) => c.id !== carId),
+        carPassengers: prev.carPassengers.filter((cp) => cp.car_id !== carId),
+      }),
+      () => supabase.from('cars').delete().eq('id', carId),
+      'Auto non eliminata.',
+    )
   }
 
   async function takeSeat(carId: string) {
     if (currentCarId)
       await mutate('car_passengers.leave', supabase.from('car_passengers').delete().eq('member_id', currentMember.id))
-    await mutate(
+    await mutateNotify(
       'car_passengers.take',
       supabase.from('car_passengers').insert({ car_id: carId, member_id: currentMember.id }),
+      'Posto non assegnato.',
     )
   }
 
-  async function leaveSeat() {
-    await mutate('car_passengers.leave', supabase.from('car_passengers').delete().eq('member_id', currentMember.id))
+  function leaveSeat() {
+    optimistic(
+      'car_passengers.leave',
+      (prev) => ({ ...prev, carPassengers: prev.carPassengers.filter((cp) => cp.member_id !== currentMember.id) }),
+      () => supabase.from('car_passengers').delete().eq('member_id', currentMember.id),
+      'Non sei riuscito a lasciare il posto.',
+    )
   }
 
   async function assignMember(carId: string, memberId: string) {
     await mutate('car_passengers.reassignClear', supabase.from('car_passengers').delete().eq('member_id', memberId))
-    await mutate('car_passengers.assign', supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId }))
+    await mutateNotify(
+      'car_passengers.assign',
+      supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId }),
+      'Assegnazione non riuscita.',
+    )
   }
 
   const roomWideProposals = stopProposals.filter((p) => p.car_id === null)
@@ -308,7 +329,11 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
   async function addItem(e: FormEvent) {
     e.preventDefault()
     if (!item.trim()) return
-    await mutate('car_cargo.insert', supabase.from('car_cargo').insert({ car_id: carId, item: item.trim(), packed: false }))
+    await mutateNotify(
+      'car_cargo.insert',
+      supabase.from('car_cargo').insert({ car_id: carId, item: item.trim(), packed: false }),
+      'Oggetto non aggiunto.',
+    )
     setItem('')
     setAdding(false)
   }

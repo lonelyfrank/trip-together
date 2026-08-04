@@ -2,7 +2,7 @@ import { Check, Circle, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
-import { mutate } from '../../lib/db'
+import { mutateNotify } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Member, RoomChecklistItem } from '../../types'
 
@@ -23,9 +23,10 @@ export default function ChecklistSection({ roomId, currentMember, members, items
   async function addItem(e: FormEvent) {
     e.preventDefault()
     if (!title.trim()) return
-    await mutate(
+    await mutateNotify(
       'room_checklist_items.insert',
       supabase.from('room_checklist_items').insert({ room_id: roomId, title: title.trim(), created_by: currentMember.id }),
+      'Voce non aggiunta.',
     )
     setTitle('')
     setAdding(false)

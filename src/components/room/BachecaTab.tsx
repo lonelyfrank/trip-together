@@ -2,7 +2,8 @@ import { ChevronRight, ClipboardList, Link2, Pin, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
-import { mutate } from '../../lib/db'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
+import { mutateNotify } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { BoardLink, BoardNote, Member, RoomChecklistItem } from '../../types'
 import ChecklistSection from './ChecklistSection'
@@ -31,31 +32,42 @@ export default function BachecaTab({
   const [addingLink, setAddingLink] = useState(false)
   const [linkLabel, setLinkLabel] = useState('')
   const [linkUrl, setLinkUrl] = useState('')
+  const optimistic = useRoomOptimistic(roomId)
 
   const notes = [...boardNotes].sort((a, b) => Number(b.pinned) - Number(a.pinned))
 
   async function addNote(e: FormEvent) {
     e.preventDefault()
     if (!noteText.trim()) return
-    await mutate(
+    await mutateNotify(
       'board_notes.insert',
       supabase.from('board_notes').insert({ room_id: roomId, text: noteText.trim(), pinned: notePinned }),
+      'Nota non salvata.',
     )
     setNoteText('')
     setNotePinned(false)
     setAddingNote(false)
   }
 
-  async function togglePin(note: BoardNote) {
-    await mutate('board_notes.togglePin', supabase.from('board_notes').update({ pinned: !note.pinned }).eq('id', note.id))
+  function togglePin(note: BoardNote) {
+    optimistic(
+      'board_notes.togglePin',
+      (prev) => ({
+        ...prev,
+        boardNotes: prev.boardNotes.map((n) => (n.id === note.id ? { ...n, pinned: !n.pinned } : n)),
+      }),
+      () => supabase.from('board_notes').update({ pinned: !note.pinned }).eq('id', note.id),
+      'Nota non aggiornata.',
+    )
   }
 
   async function addLink(e: FormEvent) {
     e.preventDefault()
     if (!linkLabel.trim() || !linkUrl.trim()) return
-    await mutate(
+    await mutateNotify(
       'board_links.insert',
       supabase.from('board_links').insert({ room_id: roomId, label: linkLabel.trim(), url: linkUrl.trim() }),
+      'Link non salvato.',
     )
     setLinkLabel('')
     setLinkUrl('')
