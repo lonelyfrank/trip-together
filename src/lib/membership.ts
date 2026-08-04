@@ -1,6 +1,16 @@
 import { getSavedRoomEntry, saveCrewEntry, saveRoomEntry, setMyName } from './localRooms'
+import { queryClient } from './queryClient'
 import { generateRoomCode } from './roomCode'
 import { ensureAnonymousSession, supabase } from './supabase'
+
+// Le liste in Home/Crew vivono nella cache TanStack Query: dopo aver creato o
+// aggiunto una stanza/comitiva le invalidiamo così si aggiornano subito.
+function invalidateMyRooms() {
+  queryClient.invalidateQueries({ queryKey: ['my-rooms'] })
+}
+function invalidateMyCrews() {
+  queryClient.invalidateQueries({ queryKey: ['my-crews'] })
+}
 
 // Workflow condiviso di ingresso: garantisce la sessione anonima, crea/aggancia
 // lo slot-membro, ricorda nome, stanze e comitive sul device. Un posto solo per
@@ -29,6 +39,8 @@ export async function createRoomAndJoin(title: string, displayName: string, crew
 
   setMyName(displayName.trim())
   saveRoomEntry({ roomId: room.id, memberId: member.id, inviteCode })
+  invalidateMyRooms()
+  if (crewId) queryClient.invalidateQueries({ queryKey: ['crew-data', crewId] })
   return room.id
 }
 
@@ -47,6 +59,7 @@ export async function joinRoomAsMember(roomId: string, inviteCode: string, displ
 
   setMyName(displayName.trim())
   saveRoomEntry({ roomId, memberId: member.id, inviteCode })
+  invalidateMyRooms()
 }
 
 // ─── Comitive ─────────────────────────────────────────────────────────────
@@ -73,6 +86,7 @@ export async function createCrew(name: string, displayName: string): Promise<str
 
   setMyName(displayName.trim())
   saveCrewEntry({ crewId: crew.id, crewMemberId: member.id, inviteCode })
+  invalidateMyCrews()
   return crew.id
 }
 
@@ -93,6 +107,8 @@ export async function joinCrewAsMember(crewId: string, inviteCode: string, displ
 
   setMyName(displayName.trim())
   saveCrewEntry({ crewId, crewMemberId: member.id, inviteCode })
+  invalidateMyCrews()
+  queryClient.invalidateQueries({ queryKey: ['crew-data', crewId] })
 }
 
 // ─── Risoluzione codice invito (stanza o comitiva) ─────────────────────────
