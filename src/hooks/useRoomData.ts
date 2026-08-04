@@ -64,6 +64,29 @@ const EMPTY_PAYLOAD: RoomPayload = {
 
 export const roomDataKey = (roomId: string) => ['room-data', roomId] as const
 
+// Config unica: tabella → collezione nel payload + colonne di primary key.
+// Guida sia le sottoscrizioni realtime (tutte filtrate per room_id) sia le
+// patch mirate della cache. `id` dove non indicato.
+type CollectionKey = Exclude<keyof RoomPayload, 'error' | 'room'>
+const TABLES: { table: string; key: CollectionKey; pk: string[] }[] = [
+  { table: 'members', key: 'members', pk: ['id'] },
+  { table: 'cars', key: 'cars', pk: ['id'] },
+  { table: 'car_passengers', key: 'carPassengers', pk: ['id'] },
+  { table: 'car_expenses', key: 'carExpenses', pk: ['id'] },
+  { table: 'car_cargo', key: 'carCargo', pk: ['id'] },
+  { table: 'delay_reports', key: 'delayReports', pk: ['id'] },
+  { table: 'general_expenses', key: 'generalExpenses', pk: ['id'] },
+  { table: 'general_expense_participants', key: 'generalExpenseParticipants', pk: ['id'] },
+  { table: 'board_notes', key: 'boardNotes', pk: ['id'] },
+  { table: 'board_links', key: 'boardLinks', pk: ['id'] },
+  { table: 'radar_positions', key: 'radarPositions', pk: ['member_id'] },
+  { table: 'room_checklist_items', key: 'roomChecklistItems', pk: ['id'] },
+  { table: 'stop_proposals', key: 'stopProposals', pk: ['id'] },
+  { table: 'stop_proposal_votes', key: 'stopProposalVotes', pk: ['proposal_id', 'member_id'] },
+  { table: 'ride_requests', key: 'rideRequests', pk: ['id'] },
+]
+const BY_TABLE = new Map(TABLES.map((t) => [t.table, t]))
+
 async function fetchRoomData(id: string): Promise<RoomPayload> {
   const [
     roomQ,
@@ -86,29 +109,14 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     query<Room>('rooms.byId', supabase.from('rooms').select('*').eq('id', id).maybeSingle()),
     query<Member[]>('members.byRoom', supabase.from('members').select('*').eq('room_id', id)),
     query<Car[]>('cars.byRoom', supabase.from('cars').select('*').eq('room_id', id)),
-    query<CarPassenger[]>(
-      'car_passengers.byRoom',
-      supabase.from('car_passengers').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-    ),
-    query<CarExpense[]>(
-      'car_expenses.byRoom',
-      supabase.from('car_expenses').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-    ),
-    query<CarCargoItem[]>(
-      'car_cargo.byRoom',
-      supabase.from('car_cargo').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-    ),
-    query<DelayReport[]>(
-      'delay_reports.byRoom',
-      supabase.from('delay_reports').select('*, cars!inner(room_id)').eq('cars.room_id', id),
-    ),
+    query<CarPassenger[]>('car_passengers.byRoom', supabase.from('car_passengers').select('*').eq('room_id', id)),
+    query<CarExpense[]>('car_expenses.byRoom', supabase.from('car_expenses').select('*').eq('room_id', id)),
+    query<CarCargoItem[]>('car_cargo.byRoom', supabase.from('car_cargo').select('*').eq('room_id', id)),
+    query<DelayReport[]>('delay_reports.byRoom', supabase.from('delay_reports').select('*').eq('room_id', id)),
     query<GeneralExpense[]>('general_expenses.byRoom', supabase.from('general_expenses').select('*').eq('room_id', id)),
     query<GeneralExpenseParticipant[]>(
       'general_expense_participants.byRoom',
-      supabase
-        .from('general_expense_participants')
-        .select('*, general_expenses!inner(room_id)')
-        .eq('general_expenses.room_id', id),
+      supabase.from('general_expense_participants').select('*').eq('room_id', id),
     ),
     query<BoardNote[]>('board_notes.byRoom', supabase.from('board_notes').select('*').eq('room_id', id)),
     query<BoardLink[]>('board_links.byRoom', supabase.from('board_links').select('*').eq('room_id', id)),
@@ -120,30 +128,16 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     query<StopProposal[]>('stop_proposals.byRoom', supabase.from('stop_proposals').select('*').eq('room_id', id)),
     query<StopProposalVote[]>(
       'stop_proposal_votes.byRoom',
-      supabase.from('stop_proposal_votes').select('*, stop_proposals!inner(room_id)').eq('stop_proposals.room_id', id),
+      supabase.from('stop_proposal_votes').select('*').eq('room_id', id),
     ),
     query<RideRequest[]>('ride_requests.byRoom', supabase.from('ride_requests').select('*').eq('room_id', id)),
   ])
 
   return {
-    error: firstError(
-      roomQ,
-      membersQ,
-      carsQ,
-      carPassengersQ,
-      carExpensesQ,
-      carCargoQ,
-      delayReportsQ,
-      generalExpensesQ,
-      generalExpenseParticipantsQ,
-      boardNotesQ,
-      boardLinksQ,
-      radarQ,
-      roomChecklistQ,
-      stopProposalsQ,
-      stopProposalVotesQ,
-      rideRequestsQ,
-    ),
+    // Solo le query essenziali determinano lo stato d'errore della stanza: le
+    // tabelle-feature che falliscono (o la cui colonna manca) degradano a vuoto
+    // — l'errore è comunque loggato da query(), quindi mai silenzioso.
+    error: firstError(roomQ, membersQ, carsQ),
     room: single(roomQ),
     members: rows(membersQ),
     cars: rows(carsQ),
@@ -163,6 +157,38 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
   }
 }
 
+// Righe realtime non tipizzate dal client: any è intenzionale.
+type Row = Record<string, any>
+
+/** Applica un singolo evento realtime alla cache, senza refetch. */
+function applyChange(
+  prev: RoomPayload,
+  table: string,
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE',
+  newRow: Row,
+  oldRow: Row,
+): RoomPayload {
+  if (table === 'rooms') {
+    if (eventType === 'DELETE') return { ...prev, room: null }
+    return { ...prev, room: newRow as Room }
+  }
+
+  const cfg = BY_TABLE.get(table)
+  if (!cfg) return prev
+
+  const list = prev[cfg.key] as Row[]
+  const idOf = (r: Row) => cfg.pk.map((k) => r?.[k]).join('|')
+
+  if (eventType === 'INSERT') {
+    if (list.some((x) => idOf(x) === idOf(newRow))) return prev
+    return { ...prev, [cfg.key]: [...list, newRow] }
+  }
+  if (eventType === 'UPDATE') {
+    return { ...prev, [cfg.key]: list.map((x) => (idOf(x) === idOf(newRow) ? newRow : x)) }
+  }
+  return { ...prev, [cfg.key]: list.filter((x) => idOf(x) !== idOf(oldRow)) }
+}
+
 export function useRoomData(roomId: string | undefined) {
   const queryClient = useQueryClient()
 
@@ -174,59 +200,37 @@ export function useRoomData(roomId: string | undefined) {
 
   useEffect(() => {
     if (!roomId) return
+
     const invalidate = () => queryClient.invalidateQueries({ queryKey: roomDataKey(roomId) })
 
-    // NB: alcune tabelle (car_passengers, car_expenses, car_cargo, delay_reports,
-    // general_expense_participants, stop_proposal_votes) non hanno ancora room_id
-    // diretto, quindi qui restano senza filtro e invalidano su qualsiasi stanza.
-    // Lo STEP 3b aggiunge room_id + filtro + patch mirate al posto dell'invalidazione.
-    const channel = supabase
+    const patch = (table: string) => (payload: { eventType: string; new: Row; old: Row }) => {
+      queryClient.setQueryData(roomDataKey(roomId), (prev?: RoomPayload) =>
+        prev ? applyChange(prev, table, payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE', payload.new, payload.old) : prev,
+      )
+    }
+
+    // UN canale, tutte le sottoscrizioni filtrate per room_id: un evento tocca
+    // solo la sua collezione (patch mirata), niente refetch totale.
+    let channel = supabase
       .channel(`room-data:${roomId}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'members', filter: `room_id=eq.${roomId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'cars', filter: `room_id=eq.${roomId}` }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'car_passengers' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'car_expenses' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'car_cargo' }, invalidate)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'delay_reports' }, invalidate)
-      .on(
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `id=eq.${roomId}` }, patch('rooms'))
+    for (const { table } of TABLES) {
+      channel = channel.on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'general_expenses', filter: `room_id=eq.${roomId}` },
-        invalidate,
+        { event: '*', schema: 'public', table, filter: `room_id=eq.${roomId}` },
+        patch(table),
       )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'general_expense_participants' }, invalidate)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'board_notes', filter: `room_id=eq.${roomId}` },
-        invalidate,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'board_links', filter: `room_id=eq.${roomId}` },
-        invalidate,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'radar_positions', filter: `room_id=eq.${roomId}` },
-        invalidate,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'room_checklist_items', filter: `room_id=eq.${roomId}` },
-        invalidate,
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'stop_proposals', filter: `room_id=eq.${roomId}` },
-        invalidate,
-      )
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'stop_proposal_votes' }, invalidate)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'ride_requests', filter: `room_id=eq.${roomId}` },
-        invalidate,
-      )
-      .subscribe()
+    }
+
+    // Alla RI-connessione del canale si può aver perso qualche evento: un solo
+    // refetch di riconciliazione come fallback (non ad ogni evento).
+    let wasSubscribed = false
+    channel.subscribe((status) => {
+      if (status === 'SUBSCRIBED') {
+        if (wasSubscribed) invalidate()
+        wasSubscribed = true
+      }
+    })
 
     return () => {
       supabase.removeChannel(channel)
