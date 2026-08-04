@@ -22,7 +22,7 @@ import type {
   StopProposalVote,
 } from '../types'
 
-interface RoomPayload {
+export interface RoomPayload {
   error: PostgrestError | null
   room: Room | null
   members: Member[]

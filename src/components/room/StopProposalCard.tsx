@@ -2,7 +2,7 @@ import { Clock, Fuel, HelpCircle, Utensils } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
-import { mutate } from '../../lib/db'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { computeOutcome, remainingFraction } from '../../lib/proposals'
 import { supabase } from '../../lib/supabase'
 import type { Member, StopProposal, StopProposalVote } from '../../types'
@@ -30,6 +30,7 @@ interface StopProposalCardProps {
 
 export default function StopProposalCard({ proposal, votes, eligibleMembers, currentMemberId }: StopProposalCardProps) {
   const [, setTick] = useState(0)
+  const optimistic = useRoomOptimistic(proposal.room_id)
 
   useEffect(() => {
     const id = setInterval(() => setTick((t) => t + 1), 3000)
@@ -46,12 +47,24 @@ export default function StopProposalCard({ proposal, votes, eligibleMembers, cur
   const myVote = votes.find((v) => v.member_id === currentMemberId)?.vote
   const canVote = outcome === 'pending' && eligibleMembers.some((m) => m.id === currentMemberId)
 
-  async function castVote(vote: 'yes' | 'no') {
-    await mutate(
+  function castVote(vote: 'yes' | 'no') {
+    const now = new Date().toISOString()
+    optimistic(
       'stop_proposal_votes.cast',
-      supabase
-        .from('stop_proposal_votes')
-        .upsert({ proposal_id: proposal.id, member_id: currentMemberId, vote }, { onConflict: 'proposal_id,member_id' }),
+      (prev) => {
+        const others = prev.stopProposalVotes.filter(
+          (v) => !(v.proposal_id === proposal.id && v.member_id === currentMemberId),
+        )
+        return {
+          ...prev,
+          stopProposalVotes: [...others, { proposal_id: proposal.id, member_id: currentMemberId, vote, voted_at: now }],
+        }
+      },
+      () =>
+        supabase
+          .from('stop_proposal_votes')
+          .upsert({ proposal_id: proposal.id, member_id: currentMemberId, vote }, { onConflict: 'proposal_id,member_id' }),
+      'Voto non registrato.',
     )
   }
 

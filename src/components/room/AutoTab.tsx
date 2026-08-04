@@ -3,6 +3,7 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type {
@@ -234,7 +235,7 @@ export default function AutoTab({
               </div>
             )}
 
-            <CarCargoSection carId={car.id} cargo={cargo} />
+            <CarCargoSection roomId={roomId} carId={car.id} cargo={cargo} />
           </Card>
         )
       })}
@@ -287,14 +288,20 @@ export default function AutoTab({
   )
 }
 
-function CarCargoSection({ carId, cargo }: { carId: string; cargo: CarCargoItem[] }) {
+function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: string; cargo: CarCargoItem[] }) {
   const [adding, setAdding] = useState(false)
   const [item, setItem] = useState('')
+  const optimistic = useRoomOptimistic(roomId)
 
-  async function toggle(cargoItem: CarCargoItem) {
-    await mutate(
+  function toggle(cargoItem: CarCargoItem) {
+    optimistic(
       'car_cargo.togglePacked',
-      supabase.from('car_cargo').update({ packed: !cargoItem.packed }).eq('id', cargoItem.id),
+      (prev) => ({
+        ...prev,
+        carCargo: prev.carCargo.map((c) => (c.id === cargoItem.id ? { ...c, packed: !c.packed } : c)),
+      }),
+      () => supabase.from('car_cargo').update({ packed: !cargoItem.packed }).eq('id', cargoItem.id),
+      'Carico non aggiornato.',
     )
   }
 

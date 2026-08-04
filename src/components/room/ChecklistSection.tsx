@@ -1,6 +1,7 @@
 import { Check, Circle, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutate } from '../../lib/db'
 import { supabase } from '../../lib/supabase'
 import type { Member, RoomChecklistItem } from '../../types'
@@ -15,6 +16,7 @@ interface ChecklistSectionProps {
 export default function ChecklistSection({ roomId, currentMember, members, items }: ChecklistSectionProps) {
   const [adding, setAdding] = useState(false)
   const [title, setTitle] = useState('')
+  const optimistic = useRoomOptimistic(roomId)
 
   const memberById = (id: string | null) => members.find((m) => m.id === id)
 
@@ -29,22 +31,32 @@ export default function ChecklistSection({ roomId, currentMember, members, items
     setAdding(false)
   }
 
-  async function selfAssign(item: RoomChecklistItem) {
-    await mutate(
+  function selfAssign(item: RoomChecklistItem) {
+    optimistic(
       'room_checklist_items.selfAssign',
-      supabase.from('room_checklist_items').update({ assigned_to: currentMember.id }).eq('id', item.id),
+      (prev) => ({
+        ...prev,
+        roomChecklistItems: prev.roomChecklistItems.map((i) =>
+          i.id === item.id ? { ...i, assigned_to: currentMember.id } : i,
+        ),
+      }),
+      () => supabase.from('room_checklist_items').update({ assigned_to: currentMember.id }).eq('id', item.id),
+      'Assegnazione non salvata.',
     )
   }
 
-  async function toggleStatus(item: RoomChecklistItem) {
+  function toggleStatus(item: RoomChecklistItem) {
     const canToggle = currentMember.role === 'creator' || item.assigned_to === currentMember.id
     if (!canToggle) return
-    await mutate(
+    const next = item.status === 'portato' ? 'da_portare' : 'portato'
+    optimistic(
       'room_checklist_items.toggleStatus',
-      supabase
-        .from('room_checklist_items')
-        .update({ status: item.status === 'portato' ? 'da_portare' : 'portato' })
-        .eq('id', item.id),
+      (prev) => ({
+        ...prev,
+        roomChecklistItems: prev.roomChecklistItems.map((i) => (i.id === item.id ? { ...i, status: next } : i)),
+      }),
+      () => supabase.from('room_checklist_items').update({ status: next }).eq('id', item.id),
+      'Modifica checklist non salvata.',
     )
   }
 

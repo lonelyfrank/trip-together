@@ -2,6 +2,7 @@ import { Check } from 'lucide-react'
 import { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Chip from '../ui/Chip'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutate } from '../../lib/db'
 import { formatRelativeTime } from '../../lib/time'
 import { supabase } from '../../lib/supabase'
@@ -25,33 +26,36 @@ interface TravelStatusChipProps {
 
 export default function TravelStatusChip({ car, currentMemberId, canEdit }: TravelStatusChipProps) {
   const [open, setOpen] = useState(false)
+  const optimistic = useRoomOptimistic(car.room_id)
   const meta = STATUS_META[car.travel_status]
 
-  async function setStatus(status: TravelStatus) {
-    await mutate(
+  function setStatus(status: TravelStatus) {
+    const now = new Date().toISOString()
+    setOpen(false)
+    optimistic(
       'cars.setTravelStatus',
-      supabase
-        .from('cars')
-        .update({
-          travel_status: status,
-          travel_status_updated_at: new Date().toISOString(),
-          travel_status_updated_by: currentMemberId,
-        })
-        .eq('id', car.id),
+      (prev) => ({
+        ...prev,
+        cars: prev.cars.map((c) =>
+          c.id === car.id
+            ? { ...c, travel_status: status, travel_status_updated_at: now, travel_status_updated_by: currentMemberId }
+            : c,
+        ),
+      }),
+      () =>
+        supabase
+          .from('cars')
+          .update({ travel_status: status, travel_status_updated_at: now, travel_status_updated_by: currentMemberId })
+          .eq('id', car.id),
+      'Stato viaggio non aggiornato.',
     )
 
     if (status === 'arrivata') {
-      await mutate(
+      mutate(
         'delay_reports.resolveOnArrival',
-        supabase
-          .from('delay_reports')
-          .update({ resolved_at: new Date().toISOString() })
-          .eq('car_id', car.id)
-          .is('resolved_at', null),
+        supabase.from('delay_reports').update({ resolved_at: now }).eq('car_id', car.id).is('resolved_at', null),
       )
     }
-
-    setOpen(false)
   }
 
   return (
