@@ -3,7 +3,12 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutateNotify } from '../../lib/db'
-import { supabase } from '../../lib/supabase'
+import {
+  cancelRideRequest,
+  insertCarPassenger,
+  insertRideRequest,
+  matchRideRequest,
+} from '../../lib/mutations'
 import type { Car, CarPassenger, Member, RideRequest } from '../../types'
 
 interface RideRequestsSectionProps {
@@ -36,11 +41,7 @@ export default function RideRequestsSection({
   )
 
   async function requestRide() {
-    await mutateNotify(
-      'ride_requests.insert',
-      supabase.from('ride_requests').insert({ room_id: roomId, member_id: currentMember.id }),
-      'Richiesta non inviata.',
-    )
+    await mutateNotify('ride_requests.insert', insertRideRequest(roomId, currentMember.id), 'Richiesta non inviata.')
   }
 
   function cancelRequest() {
@@ -52,7 +53,7 @@ export default function RideRequestsSection({
         ...prev,
         rideRequests: prev.rideRequests.map((r) => (r.id === id ? { ...r, status: 'cancelled' } : r)),
       }),
-      () => supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', id),
+      () => cancelRideRequest(id),
       'Annullamento non riuscito.',
     )
   }
@@ -61,17 +62,10 @@ export default function RideRequestsSection({
     if (!myCarWithFreeSeat) return
     await mutateNotify(
       'car_passengers.offerSeat',
-      supabase.from('car_passengers').insert({ car_id: myCarWithFreeSeat.id, member_id: request.member_id }),
+      insertCarPassenger(myCarWithFreeSeat.id, request.member_id),
       'Posto non offerto.',
     )
-    await mutateNotify(
-      'ride_requests.match',
-      supabase
-        .from('ride_requests')
-        .update({ status: 'matched', matched_car_id: myCarWithFreeSeat.id })
-        .eq('id', request.id),
-      'Match non registrato.',
-    )
+    await mutateNotify('ride_requests.match', matchRideRequest(request.id, myCarWithFreeSeat.id), 'Match non registrato.')
   }
 
   if (!amUnassigned && othersWaiting.length === 0) return null

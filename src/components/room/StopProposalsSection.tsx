@@ -3,7 +3,7 @@ import { type FormEvent, useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
 import { mutateNotify } from '../../lib/db'
-import { supabase } from '../../lib/supabase'
+import { insertStopProposal } from '../../lib/mutations'
 import type { Member, StopProposal, StopProposalType, StopProposalVote } from '../../types'
 import StopProposalCard from './StopProposalCard'
 
@@ -49,13 +49,7 @@ export default function StopProposalsSection({
     try {
       await mutateNotify(
         'stop_proposals.insert',
-        supabase.from('stop_proposals').insert({
-          room_id: roomId,
-          car_id: carId,
-          proposed_by: currentMember.id,
-          type,
-          note: note.trim() || null,
-        }),
+        insertStopProposal(roomId, carId, currentMember.id, type, note.trim() || null),
         'Proposta non inviata.',
       )
       setType(null)

@@ -6,7 +6,11 @@ import Chip from '../ui/Chip'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { computeBalances, computeTransfers } from '../../lib/balances'
 import { mutateNotify } from '../../lib/db'
-import { supabase } from '../../lib/supabase'
+import {
+  insertGeneralExpense,
+  insertGeneralExpenseParticipants,
+  waiveGeneralExpense,
+} from '../../lib/mutations'
 import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member } from '../../types'
 
 interface SpeseTabProps {
@@ -61,8 +65,7 @@ export default function SpeseTab({
           e.id === expenseId ? { ...e, waived: true, waived_by_member_id: currentMember.id } : e,
         ),
       }),
-      () =>
-        supabase.from('general_expenses').update({ waived: true, waived_by_member_id: currentMember.id }).eq('id', expenseId),
+      () => waiveGeneralExpense(expenseId, currentMember.id),
       'Condono non salvato.',
     )
   }
@@ -75,20 +78,14 @@ export default function SpeseTab({
     try {
       const { data: expense, error } = await mutateNotify<{ id: string }>(
         'general_expenses.insert',
-        supabase
-          .from('general_expenses')
-          .insert({ room_id: roomId, label: label.trim(), amount: value, paid_by_member_id: paidBy })
-          .select()
-          .single(),
+        insertGeneralExpense(roomId, label, value, paidBy),
         'Spesa non salvata.',
       )
       if (error || !expense) return
 
       await mutateNotify(
         'general_expense_participants.insert',
-        supabase
-          .from('general_expense_participants')
-          .insert(participantIds.map((memberId) => ({ expense_id: expense.id, member_id: memberId }))),
+        insertGeneralExpenseParticipants(expense.id, participantIds),
         'Partecipanti spesa non salvati.',
       )
 

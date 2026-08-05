@@ -4,7 +4,14 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { computeBalances, computeTransfers } from '../../lib/balances'
 import { mutate } from '../../lib/db'
-import { supabase } from '../../lib/supabase'
+import {
+  closeRoom,
+  deleteBoardLinksByRoom,
+  deleteBoardNotesByRoom,
+  deleteCarsByRoom,
+  deleteGeneralExpensesByRoom,
+  deleteRadarPositionsByRoom,
+} from '../../lib/mutations'
 import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member, Room } from '../../types'
 
 interface CloseRoomSectionProps {
@@ -38,18 +45,18 @@ export default function CloseRoomSection({
   const transfers = computeTransfers(balances)
   const hasOpenBalance = transfers.length > 0
 
-  async function closeRoom() {
+  async function handleClose() {
     if (!window.confirm('Chiudere la stanza? Auto, spese, bacheca e radar verranno cancellati definitivamente.')) {
       return
     }
     setClosing(true)
     try {
-      await mutate('cars.deleteByRoom', supabase.from('cars').delete().eq('room_id', room.id))
-      await mutate('general_expenses.deleteByRoom', supabase.from('general_expenses').delete().eq('room_id', room.id))
-      await mutate('board_notes.deleteByRoom', supabase.from('board_notes').delete().eq('room_id', room.id))
-      await mutate('board_links.deleteByRoom', supabase.from('board_links').delete().eq('room_id', room.id))
-      await mutate('radar_positions.deleteByRoom', supabase.from('radar_positions').delete().eq('room_id', room.id))
-      await mutate('rooms.close', supabase.from('rooms').update({ status: 'closed' }).eq('id', room.id))
+      await mutate('cars.deleteByRoom', deleteCarsByRoom(room.id))
+      await mutate('general_expenses.deleteByRoom', deleteGeneralExpensesByRoom(room.id))
+      await mutate('board_notes.deleteByRoom', deleteBoardNotesByRoom(room.id))
+      await mutate('board_links.deleteByRoom', deleteBoardLinksByRoom(room.id))
+      await mutate('radar_positions.deleteByRoom', deleteRadarPositionsByRoom(room.id))
+      await mutate('rooms.close', closeRoom(room.id))
       onClosed()
     } finally {
       setClosing(false)
@@ -81,7 +88,7 @@ export default function CloseRoomSection({
             Tutti i conti sono a zero. Chiudendo la stanza, auto, spese, bacheca e radar verranno cancellati —
             la stanza resterà visibile come archiviata.
           </p>
-          <Button variant="outline" className="w-full" onClick={closeRoom} disabled={closing}>
+          <Button variant="outline" className="w-full" onClick={handleClose} disabled={closing}>
             {closing ? 'Chiusura...' : 'Chiudi stanza'}
           </Button>
         </>

@@ -4,8 +4,8 @@ import BottomSheet from '../ui/BottomSheet'
 import Chip from '../ui/Chip'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutate } from '../../lib/db'
+import { resolveDelayReportsForCar, setCarTravelStatus } from '../../lib/mutations'
 import { formatRelativeTime } from '../../lib/time'
-import { supabase } from '../../lib/supabase'
 import type { Car, TravelStatus } from '../../types'
 
 const STATUS_META: Record<TravelStatus, { label: string; tone: 'muted' | 'amber' | 'teal' | 'alert' }> = {
@@ -42,19 +42,12 @@ export default function TravelStatusChip({ car, currentMemberId, canEdit }: Trav
             : c,
         ),
       }),
-      () =>
-        supabase
-          .from('cars')
-          .update({ travel_status: status, travel_status_updated_at: now, travel_status_updated_by: currentMemberId })
-          .eq('id', car.id),
+      () => setCarTravelStatus(car.id, status, currentMemberId, now),
       'Stato viaggio non aggiornato.',
     )
 
     if (status === 'arrivata') {
-      mutate(
-        'delay_reports.resolveOnArrival',
-        supabase.from('delay_reports').update({ resolved_at: now }).eq('car_id', car.id).is('resolved_at', null),
-      )
+      mutate('delay_reports.resolveOnArrival', resolveDelayReportsForCar(car.id, now))
     }
   }
 

@@ -3,7 +3,7 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutateNotify } from '../../lib/db'
-import { supabase } from '../../lib/supabase'
+import { assignChecklistItem, insertChecklistItem, updateChecklistItemStatus } from '../../lib/mutations'
 import type { Member, RoomChecklistItem } from '../../types'
 
 interface ChecklistSectionProps {
@@ -25,7 +25,7 @@ export default function ChecklistSection({ roomId, currentMember, members, items
     if (!title.trim()) return
     await mutateNotify(
       'room_checklist_items.insert',
-      supabase.from('room_checklist_items').insert({ room_id: roomId, title: title.trim(), created_by: currentMember.id }),
+      insertChecklistItem(roomId, title, currentMember.id),
       'Voce non aggiunta.',
     )
     setTitle('')
@@ -41,7 +41,7 @@ export default function ChecklistSection({ roomId, currentMember, members, items
           i.id === item.id ? { ...i, assigned_to: currentMember.id } : i,
         ),
       }),
-      () => supabase.from('room_checklist_items').update({ assigned_to: currentMember.id }).eq('id', item.id),
+      () => assignChecklistItem(item.id, currentMember.id),
       'Assegnazione non salvata.',
     )
   }
@@ -56,7 +56,7 @@ export default function ChecklistSection({ roomId, currentMember, members, items
         ...prev,
         roomChecklistItems: prev.roomChecklistItems.map((i) => (i.id === item.id ? { ...i, status: next } : i)),
       }),
-      () => supabase.from('room_checklist_items').update({ status: next }).eq('id', item.id),
+      () => updateChecklistItemStatus(item.id, next),
       'Modifica checklist non salvata.',
     )
   }

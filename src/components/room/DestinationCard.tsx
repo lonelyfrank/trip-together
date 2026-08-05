@@ -7,7 +7,7 @@ import EventTimeRow from './EventTimeRow'
 import WeatherStrip from './WeatherStrip'
 import { mutate } from '../../lib/db'
 import { parseMapInput } from '../../lib/mapLinks'
-import { supabase } from '../../lib/supabase'
+import { updateRoomDestination } from '../../lib/mutations'
 import type { Room } from '../../types'
 
 interface DestinationCardProps {
@@ -81,14 +81,11 @@ export default function DestinationCard({ room }: DestinationCardProps) {
       // così non blocca mai il salvataggio della destinazione.
       const { error } = await mutate(
         'rooms.updateDestination',
-        supabase
-          .from('rooms')
-          .update({
-            destination_label: label.trim() || null,
-            destination_lat: lat,
-            destination_lng: lng,
-          })
-          .eq('id', room.id),
+        updateRoomDestination(room.id, {
+          label: label.trim() || null,
+          lat,
+          lng,
+        }),
       )
 
       if (error) {

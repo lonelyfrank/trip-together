@@ -4,7 +4,7 @@ import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutateNotify } from '../../lib/db'
-import { supabase } from '../../lib/supabase'
+import { insertBoardLink, insertBoardNote, toggleBoardNotePin } from '../../lib/mutations'
 import type { BoardLink, BoardNote, Member, RoomChecklistItem } from '../../types'
 import ChecklistSection from './ChecklistSection'
 
@@ -39,11 +39,7 @@ export default function BachecaTab({
   async function addNote(e: FormEvent) {
     e.preventDefault()
     if (!noteText.trim()) return
-    await mutateNotify(
-      'board_notes.insert',
-      supabase.from('board_notes').insert({ room_id: roomId, text: noteText.trim(), pinned: notePinned }),
-      'Nota non salvata.',
-    )
+    await mutateNotify('board_notes.insert', insertBoardNote(roomId, noteText, notePinned), 'Nota non salvata.')
     setNoteText('')
     setNotePinned(false)
     setAddingNote(false)
@@ -56,7 +52,7 @@ export default function BachecaTab({
         ...prev,
         boardNotes: prev.boardNotes.map((n) => (n.id === note.id ? { ...n, pinned: !n.pinned } : n)),
       }),
-      () => supabase.from('board_notes').update({ pinned: !note.pinned }).eq('id', note.id),
+      () => toggleBoardNotePin(note.id, !note.pinned),
       'Nota non aggiornata.',
     )
   }
@@ -64,11 +60,7 @@ export default function BachecaTab({
   async function addLink(e: FormEvent) {
     e.preventDefault()
     if (!linkLabel.trim() || !linkUrl.trim()) return
-    await mutateNotify(
-      'board_links.insert',
-      supabase.from('board_links').insert({ room_id: roomId, label: linkLabel.trim(), url: linkUrl.trim() }),
-      'Link non salvato.',
-    )
+    await mutateNotify('board_links.insert', insertBoardLink(roomId, linkLabel, linkUrl), 'Link non salvato.')
     setLinkLabel('')
     setLinkUrl('')
     setAddingLink(false)

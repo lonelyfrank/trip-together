@@ -3,8 +3,8 @@ import { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
 import { mutateNotify } from '../../lib/db'
+import { insertDelayReport, resolveDelayReport } from '../../lib/mutations'
 import { formatRelativeTime } from '../../lib/time'
-import { supabase } from '../../lib/supabase'
 import type { DelayReason, DelayReport } from '../../types'
 
 const REASON_LABELS: Record<DelayReason, string> = {
@@ -35,12 +35,7 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
     try {
       await mutateNotify(
         'delay_reports.insert',
-        supabase.from('delay_reports').insert({
-          car_id: carId,
-          reason,
-          minutes_estimate: minutes,
-          reported_by: currentMemberId,
-        }),
+        insertDelayReport(carId, reason, minutes, currentMemberId),
         'Ritardo non segnalato.',
       )
       setReason(null)
@@ -55,7 +50,7 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
     if (!activeDelay) return
     await mutateNotify(
       'delay_reports.resolve',
-      supabase.from('delay_reports').update({ resolved_at: new Date().toISOString() }).eq('id', activeDelay.id),
+      resolveDelayReport(activeDelay.id, new Date().toISOString()),
       'Ritardo non chiuso.',
     )
   }

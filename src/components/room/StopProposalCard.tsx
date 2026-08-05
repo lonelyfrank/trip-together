@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
+import { upsertStopProposalVote } from '../../lib/mutations'
 import { computeOutcome, remainingFraction } from '../../lib/proposals'
-import { supabase } from '../../lib/supabase'
 import type { Member, StopProposal, StopProposalVote } from '../../types'
 
 const TYPE_META: Record<StopProposal['type'], { label: string; icon: typeof Fuel }> = {
@@ -60,10 +60,7 @@ export default function StopProposalCard({ proposal, votes, eligibleMembers, cur
           stopProposalVotes: [...others, { proposal_id: proposal.id, member_id: currentMemberId, vote, voted_at: now }],
         }
       },
-      () =>
-        supabase
-          .from('stop_proposal_votes')
-          .upsert({ proposal_id: proposal.id, member_id: currentMemberId, vote }, { onConflict: 'proposal_id,member_id' }),
+      () => upsertStopProposalVote(proposal.id, currentMemberId, vote),
       'Voto non registrato.',
     )
   }
