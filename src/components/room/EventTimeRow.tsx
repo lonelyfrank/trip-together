@@ -31,7 +31,7 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
       if (err) {
         setError(
           /event_time/.test(err.message)
-            ? 'Manca la colonna event_time: esegui la migration 006_readiness.sql su Supabase.'
+            ? 'Manca la colonna event_time: esegui supabase/migrations/20260724000000_schema.sql su Supabase.'
             : err.message,
         )
         return
