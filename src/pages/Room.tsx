@@ -12,7 +12,14 @@ import ScreenHeader from '../components/ui/ScreenHeader'
 import { useRoomData } from '../hooks/useRoomData'
 import { query } from '../lib/db'
 import { getSavedRoomEntry } from '../lib/localRooms'
+import { roomPhase, type RoomPhase } from '../lib/phase'
 import { supabase } from '../lib/supabase'
+
+const PHASE_EYEBROW: Record<RoomPhase, string> = {
+  pre: 'Stanza attiva',
+  in_corso: 'In viaggio',
+  concluso: 'Evento concluso',
+}
 
 export default function RoomPage() {
   const { roomId } = useParams<{ roomId: string }>()
@@ -88,7 +95,7 @@ export default function RoomPage() {
 
   const entry = getSavedRoomEntry(room.id)
   const currentMember = members.find((m) => m.id === entry?.memberId)
-
+  const phase = roomPhase(room.status, cars.map((c) => c.travel_status))
 
   return (
     <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink">
@@ -99,7 +106,7 @@ export default function RoomPage() {
         <ArrowLeft size={13} /> eventi
       </button>
       <ScreenHeader
-        eyebrow={`Stanza attiva · #${room.invite_code}`}
+        eyebrow={`${PHASE_EYEBROW[phase]} · #${room.invite_code}`}
         title={room.title}
         action={<Chip tone="teal">{members.length} membri</Chip>}
       />

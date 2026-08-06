@@ -1,6 +1,7 @@
 import { Check, LifeBuoy, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import Button from '../ui/Button'
+import { roomPhase } from '../../lib/phase'
 import { encodeResumeToken } from '../../lib/resumeToken'
 import { shareOrCopy } from '../../lib/share'
 import type {
@@ -52,6 +53,7 @@ export default function StanzaTab({
   const [shared, setShared] = useState(false)
   const [recoveryCopiedFor, setRecoveryCopiedFor] = useState<string | null>(null)
 
+  const phase = roomPhase(room.status, cars.map((c) => c.travel_status))
   const inviteUrl = `${window.location.origin}/join/${room.invite_code}`
 
   async function invite() {
@@ -85,14 +87,16 @@ export default function StanzaTab({
 
   return (
     <div className="space-y-3 px-4 pb-28 sm:px-6">
-      <ReadinessBanner
-        room={room}
-        currentMember={currentMember}
-        members={members}
-        cars={cars}
-        carPassengers={carPassengers}
-        onGoToAuto={onGoToAuto}
-      />
+      {phase === 'pre' && (
+        <ReadinessBanner
+          room={room}
+          currentMember={currentMember}
+          members={members}
+          cars={cars}
+          carPassengers={carPassengers}
+          onGoToAuto={onGoToAuto}
+        />
+      )}
 
       <DestinationCard room={room} />
 
@@ -127,10 +131,12 @@ export default function StanzaTab({
         </div>
       </div>
 
-      <Button variant="surface" className="w-full" onClick={invite}>
-        {shared ? <Check size={15} /> : <Share2 size={15} />}
-        {shared ? 'Link copiato!' : 'Invita amici'}
-      </Button>
+      {phase === 'pre' && (
+        <Button variant="surface" className="w-full" onClick={invite}>
+          {shared ? <Check size={15} /> : <Share2 size={15} />}
+          {shared ? 'Link copiato!' : 'Invita amici'}
+        </Button>
+      )}
 
       <CloseRoomSection
         room={room}
