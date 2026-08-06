@@ -232,7 +232,16 @@ export function useRoomData(roomId: string | undefined) {
       }
     })
 
+    // Rete di sicurezza incondizionata: il canale può restare "SUBSCRIBED"
+    // senza però consegnare un evento specifico (drift di schema su un
+    // filtro, o altre cause fuori dal nostro controllo — verificato: capita
+    // anche su tabelle non toccate dal drift noto). Un refetch periodico a
+    // bassa frequenza garantisce comunque eventual consistency, indipendente
+    // dallo stato riportato dal canale.
+    const pollId = setInterval(invalidate, 20_000)
+
     return () => {
+      clearInterval(pollId)
       supabase.removeChannel(channel)
     }
   }, [roomId, queryClient])
