@@ -74,9 +74,9 @@ Schema completo in `supabase/schema.sql` (installazione da zero, distruttiva). A
 - `ride_requests`: `id, room_id, member_id, status ('pending'|'matched'|'cancelled'), created_at, matched_car_id`
 - `radar_positions`: `member_id (pk), room_id, lat, lng, updated_at` — mai storicizzata, sempre sovrascritta
 
-RLS: **permissiva** (`using (true) with check (true)`) su tutte le tabelle in questa fase di validazione — l'accesso è comunque scoped dall'`invite_code`/`id` non indovinabile. (Nota: alcuni file migration 002–005 avevano policy scoped via `auth.uid()`, ma lo script effettivo `supabase/CATCH_UP.sql` le rende permissive per coerenza e per ridurre attriti in demo.) Realtime abilitato su tutte le tabelle.
+RLS: **permissiva** (`using (true) with check (true)`) su tutte le tabelle in questa fase di validazione — l'accesso è comunque scoped dall'`invite_code`/`id` non indovinabile. Realtime abilitato su tutte le tabelle.
 
-**Stato del DB vivo ≠ schema.sql.** Sul progetto reale spesso è applicato solo lo schema base: le feature 001→007 vanno lanciate a mano con `supabase/CATCH_UP.sql` (unico script idempotente, non distruttivo). Vedi la memory `db-migrations-manual`. Il codice degrada senza crashare quando una tabella manca (le query supabase-js risolvono con `{data:null}`), quindi controllare sempre lo stato reale con `curl` sull'endpoint REST prima di dare per scontata una tabella.
+**Fonte di verità dello schema:** le migration in `supabase/migrations/`, applicate con `supabase db push` (vedi `supabase/README.md`). Verifica rapida: `npm run db:check`. Il codice degrada senza crashare quando una tabella manca (le query supabase-js risolvono con `{data:null}`).
 
 Il hook `src/hooks/useRoomData.ts` centralizza fetch + sottoscrizioni realtime per una stanza; le tabelle senza `room_id` diretto (`car_expenses`, `car_cargo`, `car_passengers`, `delay_reports`, `stop_proposal_votes`) vengono ricaricate per intero ad ogni evento. Analoghi: `useCrewData` (una comitiva + membri + suoi eventi), `useMyRooms`/`useMyCrews` (liste per la Home).
 

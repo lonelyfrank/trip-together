@@ -35,7 +35,7 @@ console.log(`Tabelle presenti: ${present.length}/${EXPECTED_TABLES.length}`)
 if (missing.length > 0) {
   console.log(`\nMANCANTI (${missing.length}):`)
   for (const t of missing) console.log(`  · ${t}`)
-  console.log('\n→ applica le migration (o supabase/CATCH_UP.sql) sul progetto Supabase.')
+  console.log('\n→ applica le migration con `supabase db push` sul progetto Supabase.')
   process.exit(1)
 }
 

@@ -27,4 +27,3 @@ In DEV il controllo gira anche all'avvio dell'app (warning in console).
 
 - `migrations/` — **fonte di verità**, applicata con `supabase db push`.
 - `schema.sql` — istantanea leggibile **generata** (`supabase db dump -f supabase/schema.sql`); non modificare a mano.
-- `CATCH_UP.sql` — **deprecato**, fallback manuale via SQL Editor per chi non ha la CLI. Da rimuovere quando `db push` è verificato in produzione.
