@@ -76,16 +76,17 @@ export default function SpeseTab({
     if (!label.trim() || !value || participantIds.length === 0) return
     setSaving(true)
     try {
-      const { data: expense, error } = await mutateNotify<{ id: string }>(
+      const expenseId = crypto.randomUUID()
+      const { error } = await mutateNotify(
         'general_expenses.insert',
-        insertGeneralExpense(roomId, label, value, paidBy),
+        insertGeneralExpense(expenseId, roomId, label, value, paidBy),
         'Spesa non salvata.',
       )
-      if (error || !expense) return
+      if (error) return
 
       await mutateNotify(
         'general_expense_participants.insert',
-        insertGeneralExpenseParticipants(expense.id, participantIds),
+        insertGeneralExpenseParticipants(expenseId, participantIds),
         'Partecipanti spesa non salvati.',
       )
 

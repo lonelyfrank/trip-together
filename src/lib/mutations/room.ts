@@ -1,223 +1,272 @@
+import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from '../supabase'
 import type { DelayReason, StopProposalType, TravelStatus } from '../../types'
 
 // Builder Supabase centralizzati per le mutazioni di una stanza.
 // I componenti passano il risultato a mutate / mutateNotify / useRoomOptimistic.
+//
+// Ogni builder è avvolto da op(): un Op porta con sé nome + argomenti (primitivi,
+// serializzabili) oltre alla funzione run() che esegue davvero la chiamata
+// Supabase. È il prerequisito per la coda offline (src/lib/offlineQueue.ts): un
+// Op può essere rieseguito subito (online) o salvato come {name, args} in
+// localStorage e ricostruito via getOpRegistry() al ritorno online. queueable:
+// false esclude esplicitamente un builder dalla coda (usato dal radar: una
+// posizione mancata va scartata, non accodata).
+
+export interface Op<T = null> {
+  name: string
+  args: unknown[]
+  queueable?: boolean
+  run: () => PromiseLike<{ data?: T | null; error: PostgrestError | null }>
+}
+
+type OpFactory<A extends unknown[], T> = (...args: A) => Op<T>
+
+const registry: Record<string, OpFactory<any[], any>> = {}
+
+export function getOpRegistry(): Record<string, OpFactory<any[], any>> {
+  return registry
+}
+
+function op<A extends unknown[], T = null>(
+  name: string,
+  run: (...args: A) => PromiseLike<{ data?: T | null; error: PostgrestError | null }>,
+  opts?: { queueable?: boolean },
+): OpFactory<A, T> {
+  const factory: OpFactory<A, T> = (...args: A) => ({
+    name,
+    args,
+    queueable: opts?.queueable,
+    run: () => run(...args),
+  })
+  registry[name] = factory
+  return factory
+}
 
 // ─── Stanza ─────────────────────────────────────────────────────────────
 
-export function updateRoomDestination(
-  roomId: string,
-  destination: { label: string | null; lat: number | null; lng: number | null },
-) {
-  return supabase
-    .from('rooms')
-    .update({
-      destination_label: destination.label,
-      destination_lat: destination.lat,
-      destination_lng: destination.lng,
-    })
-    .eq('id', roomId)
-}
+export const updateRoomDestination = op(
+  'rooms.updateDestination',
+  (roomId: string, destination: { label: string | null; lat: number | null; lng: number | null }) =>
+    supabase
+      .from('rooms')
+      .update({
+        destination_label: destination.label,
+        destination_lat: destination.lat,
+        destination_lng: destination.lng,
+      })
+      .eq('id', roomId),
+)
 
-export function updateRoomEventTime(roomId: string, eventTimeIso: string | null) {
-  return supabase.from('rooms').update({ event_time: eventTimeIso }).eq('id', roomId)
-}
+export const updateRoomEventTime = op('rooms.updateEventTime', (roomId: string, eventTimeIso: string | null) =>
+  supabase.from('rooms').update({ event_time: eventTimeIso }).eq('id', roomId),
+)
 
-export function closeRoom(roomId: string) {
-  return supabase.from('rooms').update({ status: 'closed' }).eq('id', roomId)
-}
+export const closeRoom = op('rooms.close', (roomId: string) =>
+  supabase.from('rooms').update({ status: 'closed' }).eq('id', roomId),
+)
 
-export function deleteCarsByRoom(roomId: string) {
-  return supabase.from('cars').delete().eq('room_id', roomId)
-}
+export const deleteCarsByRoom = op('cars.deleteByRoom', (roomId: string) =>
+  supabase.from('cars').delete().eq('room_id', roomId),
+)
 
-export function deleteGeneralExpensesByRoom(roomId: string) {
-  return supabase.from('general_expenses').delete().eq('room_id', roomId)
-}
+export const deleteGeneralExpensesByRoom = op('general_expenses.deleteByRoom', (roomId: string) =>
+  supabase.from('general_expenses').delete().eq('room_id', roomId),
+)
 
-export function deleteBoardNotesByRoom(roomId: string) {
-  return supabase.from('board_notes').delete().eq('room_id', roomId)
-}
+export const deleteBoardNotesByRoom = op('board_notes.deleteByRoom', (roomId: string) =>
+  supabase.from('board_notes').delete().eq('room_id', roomId),
+)
 
-export function deleteBoardLinksByRoom(roomId: string) {
-  return supabase.from('board_links').delete().eq('room_id', roomId)
-}
+export const deleteBoardLinksByRoom = op('board_links.deleteByRoom', (roomId: string) =>
+  supabase.from('board_links').delete().eq('room_id', roomId),
+)
 
-export function deleteRadarPositionsByRoom(roomId: string) {
-  return supabase.from('radar_positions').delete().eq('room_id', roomId)
-}
+export const deleteRadarPositionsByRoom = op('radar_positions.deleteByRoom', (roomId: string) =>
+  supabase.from('radar_positions').delete().eq('room_id', roomId),
+)
 
 // ─── Membri ─────────────────────────────────────────────────────────────
 
-export function confirmMemberPresence(memberId: string) {
-  return supabase
+export const confirmMemberPresence = op('members.confirmPresence', (memberId: string) =>
+  supabase
     .from('members')
     .update({ confirmed: true, confirmed_at: new Date().toISOString() })
-    .eq('id', memberId)
-}
+    .eq('id', memberId),
+)
 
 // ─── Bacheca ────────────────────────────────────────────────────────────
 
-export function insertBoardNote(roomId: string, text: string, pinned: boolean) {
-  return supabase.from('board_notes').insert({ room_id: roomId, text: text.trim(), pinned })
-}
+export const insertBoardNote = op('board_notes.insert', (roomId: string, text: string, pinned: boolean) =>
+  supabase.from('board_notes').insert({ room_id: roomId, text: text.trim(), pinned }),
+)
 
-export function toggleBoardNotePin(noteId: string, pinned: boolean) {
-  return supabase.from('board_notes').update({ pinned }).eq('id', noteId)
-}
+export const toggleBoardNotePin = op('board_notes.togglePin', (noteId: string, pinned: boolean) =>
+  supabase.from('board_notes').update({ pinned }).eq('id', noteId),
+)
 
-export function insertBoardLink(roomId: string, label: string, url: string) {
-  return supabase.from('board_links').insert({ room_id: roomId, label: label.trim(), url: url.trim() })
-}
+export const insertBoardLink = op('board_links.insert', (roomId: string, label: string, url: string) =>
+  supabase.from('board_links').insert({ room_id: roomId, label: label.trim(), url: url.trim() }),
+)
 
 // ─── Checklist ────────────────────────────────────────────────────────────
 
-export function insertChecklistItem(roomId: string, title: string, createdBy: string) {
-  return supabase
-    .from('room_checklist_items')
-    .insert({ room_id: roomId, title: title.trim(), created_by: createdBy })
-}
+export const insertChecklistItem = op(
+  'room_checklist_items.insert',
+  (roomId: string, title: string, createdBy: string) =>
+    supabase.from('room_checklist_items').insert({ room_id: roomId, title: title.trim(), created_by: createdBy }),
+)
 
-export function assignChecklistItem(itemId: string, memberId: string) {
-  return supabase.from('room_checklist_items').update({ assigned_to: memberId }).eq('id', itemId)
-}
+export const assignChecklistItem = op('room_checklist_items.assign', (itemId: string, memberId: string) =>
+  supabase.from('room_checklist_items').update({ assigned_to: memberId }).eq('id', itemId),
+)
 
-export function updateChecklistItemStatus(itemId: string, status: 'da_portare' | 'portato') {
-  return supabase.from('room_checklist_items').update({ status }).eq('id', itemId)
-}
+export const updateChecklistItemStatus = op(
+  'room_checklist_items.updateStatus',
+  (itemId: string, status: 'da_portare' | 'portato') =>
+    supabase.from('room_checklist_items').update({ status }).eq('id', itemId),
+)
 
 // ─── Auto ─────────────────────────────────────────────────────────────────
 
-export function insertCar(roomId: string, driverMemberId: string, seatsTotal: number) {
-  return supabase.from('cars').insert({ room_id: roomId, driver_member_id: driverMemberId, seats_total: seatsTotal })
-}
+export const insertCar = op('cars.insert', (roomId: string, driverMemberId: string, seatsTotal: number) =>
+  supabase.from('cars').insert({ room_id: roomId, driver_member_id: driverMemberId, seats_total: seatsTotal }),
+)
 
-export function deleteCar(carId: string) {
-  return supabase.from('cars').delete().eq('id', carId)
-}
+export const deleteCar = op('cars.delete', (carId: string) => supabase.from('cars').delete().eq('id', carId))
 
-export function deleteCarPassengerByMember(memberId: string) {
-  return supabase.from('car_passengers').delete().eq('member_id', memberId)
-}
+export const deleteCarPassengerByMember = op('car_passengers.deleteByMember', (memberId: string) =>
+  supabase.from('car_passengers').delete().eq('member_id', memberId),
+)
 
-export function insertCarPassenger(carId: string, memberId: string) {
-  return supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId })
-}
+export const insertCarPassenger = op('car_passengers.insert', (carId: string, memberId: string) =>
+  supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId }),
+)
 
-export function setCarTravelStatus(carId: string, status: TravelStatus, updatedBy: string, updatedAt: string) {
-  return supabase
-    .from('cars')
-    .update({ travel_status: status, travel_status_updated_at: updatedAt, travel_status_updated_by: updatedBy })
-    .eq('id', carId)
-}
+export const setCarTravelStatus = op(
+  'cars.travelStatus',
+  (carId: string, status: TravelStatus, updatedBy: string, updatedAt: string) =>
+    supabase
+      .from('cars')
+      .update({ travel_status: status, travel_status_updated_at: updatedAt, travel_status_updated_by: updatedBy })
+      .eq('id', carId),
+)
 
-export function insertCarCargoItem(carId: string, item: string) {
-  return supabase.from('car_cargo').insert({ car_id: carId, item: item.trim(), packed: false })
-}
+export const insertCarCargoItem = op('car_cargo.insert', (carId: string, item: string) =>
+  supabase.from('car_cargo').insert({ car_id: carId, item: item.trim(), packed: false }),
+)
 
-export function toggleCarCargoPacked(cargoId: string, packed: boolean) {
-  return supabase.from('car_cargo').update({ packed }).eq('id', cargoId)
-}
+export const toggleCarCargoPacked = op('car_cargo.togglePacked', (cargoId: string, packed: boolean) =>
+  supabase.from('car_cargo').update({ packed }).eq('id', cargoId),
+)
 
 // ─── Ritardi ──────────────────────────────────────────────────────────────
 
-export function insertDelayReport(
-  carId: string,
-  reason: DelayReason,
-  minutesEstimate: number | null,
-  reportedBy: string,
-) {
-  return supabase.from('delay_reports').insert({
-    car_id: carId,
-    reason,
-    minutes_estimate: minutesEstimate,
-    reported_by: reportedBy,
-  })
-}
+export const insertDelayReport = op(
+  'delay_reports.insert',
+  (carId: string, reason: DelayReason, minutesEstimate: number | null, reportedBy: string) =>
+    supabase.from('delay_reports').insert({
+      car_id: carId,
+      reason,
+      minutes_estimate: minutesEstimate,
+      reported_by: reportedBy,
+    }),
+)
 
-export function resolveDelayReport(delayId: string, resolvedAt: string) {
-  return supabase.from('delay_reports').update({ resolved_at: resolvedAt }).eq('id', delayId)
-}
+export const resolveDelayReport = op('delay_reports.resolve', (delayId: string, resolvedAt: string) =>
+  supabase.from('delay_reports').update({ resolved_at: resolvedAt }).eq('id', delayId),
+)
 
-export function resolveDelayReportsForCar(carId: string, resolvedAt: string) {
-  return supabase.from('delay_reports').update({ resolved_at: resolvedAt }).eq('car_id', carId).is('resolved_at', null)
-}
+export const resolveDelayReportsForCar = op(
+  'delay_reports.resolveForCar',
+  (carId: string, resolvedAt: string) =>
+    supabase
+      .from('delay_reports')
+      .update({ resolved_at: resolvedAt })
+      .eq('car_id', carId)
+      .is('resolved_at', null),
+)
 
 // ─── Spese ────────────────────────────────────────────────────────────────
 
-export function insertGeneralExpense(
-  roomId: string,
-  label: string,
-  amount: number,
-  paidByMemberId: string,
-) {
-  return supabase
-    .from('general_expenses')
-    .insert({ room_id: roomId, label: label.trim(), amount, paid_by_member_id: paidByMemberId })
-    .select()
-    .single()
-}
+// Prende l'id già generato lato client (invece di .select().single()) così la
+// creazione della spesa e l'inserimento dei partecipanti restano due Op
+// indipendenti, rieseguibili separatamente dalla coda offline senza che il
+// secondo dipenda su un dato restituito dal primo.
+export const insertGeneralExpense = op(
+  'general_expenses.insert',
+  (id: string, roomId: string, label: string, amount: number, paidByMemberId: string) =>
+    supabase
+      .from('general_expenses')
+      .insert({ id, room_id: roomId, label: label.trim(), amount, paid_by_member_id: paidByMemberId }),
+)
 
-export function insertGeneralExpenseParticipants(expenseId: string, memberIds: string[]) {
-  return supabase
-    .from('general_expense_participants')
-    .insert(memberIds.map((memberId) => ({ expense_id: expenseId, member_id: memberId })))
-}
+export const insertGeneralExpenseParticipants = op(
+  'general_expense_participants.insert',
+  (expenseId: string, memberIds: string[]) =>
+    supabase
+      .from('general_expense_participants')
+      .insert(memberIds.map((memberId) => ({ expense_id: expenseId, member_id: memberId }))),
+)
 
-export function waiveGeneralExpense(expenseId: string, waivedByMemberId: string) {
-  return supabase
+export const waiveGeneralExpense = op('general_expenses.waive', (expenseId: string, waivedByMemberId: string) =>
+  supabase
     .from('general_expenses')
     .update({ waived: true, waived_by_member_id: waivedByMemberId })
-    .eq('id', expenseId)
-}
+    .eq('id', expenseId),
+)
 
 // ─── Proposte sosta ───────────────────────────────────────────────────────
 
-export function insertStopProposal(
-  roomId: string,
-  carId: string | null,
-  proposedBy: string,
-  type: StopProposalType,
-  note: string | null,
-) {
-  return supabase.from('stop_proposals').insert({
-    room_id: roomId,
-    car_id: carId,
-    proposed_by: proposedBy,
-    type,
-    note,
-  })
-}
+export const insertStopProposal = op(
+  'stop_proposals.insert',
+  (roomId: string, carId: string | null, proposedBy: string, type: StopProposalType, note: string | null) =>
+    supabase.from('stop_proposals').insert({
+      room_id: roomId,
+      car_id: carId,
+      proposed_by: proposedBy,
+      type,
+      note,
+    }),
+)
 
-export function upsertStopProposalVote(proposalId: string, memberId: string, vote: 'yes' | 'no') {
-  return supabase
-    .from('stop_proposal_votes')
-    .upsert({ proposal_id: proposalId, member_id: memberId, vote }, { onConflict: 'proposal_id,member_id' })
-}
+export const upsertStopProposalVote = op(
+  'stop_proposal_votes.upsert',
+  (proposalId: string, memberId: string, vote: 'yes' | 'no') =>
+    supabase
+      .from('stop_proposal_votes')
+      .upsert({ proposal_id: proposalId, member_id: memberId, vote }, { onConflict: 'proposal_id,member_id' }),
+)
 
 // ─── Richieste passaggio ──────────────────────────────────────────────────
 
-export function insertRideRequest(roomId: string, memberId: string) {
-  return supabase.from('ride_requests').insert({ room_id: roomId, member_id: memberId })
-}
+export const insertRideRequest = op('ride_requests.insert', (roomId: string, memberId: string) =>
+  supabase.from('ride_requests').insert({ room_id: roomId, member_id: memberId }),
+)
 
-export function cancelRideRequest(requestId: string) {
-  return supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', requestId)
-}
+export const cancelRideRequest = op('ride_requests.cancel', (requestId: string) =>
+  supabase.from('ride_requests').update({ status: 'cancelled' }).eq('id', requestId),
+)
 
-export function matchRideRequest(requestId: string, carId: string) {
-  return supabase.from('ride_requests').update({ status: 'matched', matched_car_id: carId }).eq('id', requestId)
-}
+export const matchRideRequest = op('ride_requests.match', (requestId: string, carId: string) =>
+  supabase.from('ride_requests').update({ status: 'matched', matched_car_id: carId }).eq('id', requestId),
+)
 
 // ─── Radar ────────────────────────────────────────────────────────────────
+// queueable: false — mai accodato offline, coerente col vincolo di dominio
+// (il radar è sempre opt-in esplicito, una posizione mancata va scartata).
 
-export function upsertRadarPosition(memberId: string, roomId: string, lat: number, lng: number, updatedAt: string) {
-  return supabase
-    .from('radar_positions')
-    .upsert({ member_id: memberId, room_id: roomId, lat, lng, updated_at: updatedAt }, { onConflict: 'member_id' })
-}
+export const upsertRadarPosition = op(
+  'radar_positions.upsert',
+  (memberId: string, roomId: string, lat: number, lng: number, updatedAt: string) =>
+    supabase
+      .from('radar_positions')
+      .upsert({ member_id: memberId, room_id: roomId, lat, lng, updated_at: updatedAt }, { onConflict: 'member_id' }),
+  { queueable: false },
+)
 
-export function deleteRadarPosition(memberId: string) {
-  return supabase.from('radar_positions').delete().eq('member_id', memberId)
-}
+export const deleteRadarPosition = op(
+  'radar_positions.delete',
+  (memberId: string) => supabase.from('radar_positions').delete().eq('member_id', memberId),
+  { queueable: false },
+)

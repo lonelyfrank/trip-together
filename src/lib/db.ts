@@ -1,4 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
+import type { Op } from './mutations/room'
+import { isOnline } from './online'
+import { enqueueOp } from './offlineQueue'
 import { showToast } from './toast'
 
 // Wrapper unico per le query di lettura: restituisce un risultato esplicito a
@@ -47,12 +50,20 @@ export function firstError(...qs: Query<unknown>[]): PostgrestError | null {
 // Wrapper unico per le scritture (insert/update/delete/upsert): centralizza le
 // mutazioni e garantisce che un errore non sia mai silenzioso (log con
 // "tabella.operazione"). Ritorna { data, error } così chi crea una riga può
-// leggerne il risultato. La gestione ottimistica/rollback arriva allo STEP 4.
+// leggerne il risultato. Se si è offline, l'Op viene accodato (vedi
+// src/lib/offlineQueue.ts) invece di tentare una fetch destinata a fallire, e
+// la scrittura torna "riuscita" (error: null, data: null) perché è solo
+// rimandata a quando si torna online. Gli Op con queueable:false (radar)
+// tentano comunque la fetch e falliscono normalmente: non vanno mai in coda.
 export async function mutate<T = null>(
   label: string,
-  builder: PromiseLike<{ data?: T | null; error: PostgrestError | null }>,
+  op: Op<T>,
 ): Promise<{ data: T | null; error: PostgrestError | null }> {
-  const res = await builder
+  if (!isOnline() && op.queueable !== false) {
+    enqueueOp(op, label)
+    return { data: null, error: null }
+  }
+  const res = await op.run()
   if (res.error) console.error(`[db] ${label} — ${res.error.message}`)
   return { data: res.data ?? null, error: res.error }
 }
@@ -64,10 +75,10 @@ export async function mutate<T = null>(
  */
 export async function mutateNotify<T = null>(
   label: string,
-  builder: PromiseLike<{ data?: T | null; error: PostgrestError | null }>,
+  op: Op<T>,
   errorMessage = 'Operazione non riuscita.',
 ): Promise<{ data: T | null; error: PostgrestError | null }> {
-  const res = await mutate(label, builder)
+  const res = await mutate(label, op)
   if (res.error) showToast(errorMessage, 'error')
   return res
 }
