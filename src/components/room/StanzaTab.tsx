@@ -1,6 +1,8 @@
-import { Check, Share2 } from 'lucide-react'
+import { Check, LifeBuoy, Share2 } from 'lucide-react'
 import { useState } from 'react'
 import Button from '../ui/Button'
+import { encodeResumeToken } from '../../lib/resumeToken'
+import { shareOrCopy } from '../../lib/share'
 import type {
   Car,
   CarExpense,
@@ -48,30 +50,36 @@ export default function StanzaTab({
   onClosed,
 }: StanzaTabProps) {
   const [shared, setShared] = useState(false)
+  const [recoveryCopiedFor, setRecoveryCopiedFor] = useState<string | null>(null)
 
   const inviteUrl = `${window.location.origin}/join/${room.invite_code}`
 
   async function invite() {
-    const shareData = {
+    const result = await shareOrCopy({
       title: room.title,
       text: `Unisciti a "${room.title}" su Trip Together`,
       url: inviteUrl,
-    }
-    // Condivisione nativa dove disponibile (mobile), altrimenti copia negli appunti.
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData)
-        return
-      } catch {
-        // annullata dall'utente o non consentita: ripiega sulla copia
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(inviteUrl)
+    })
+    if (result === 'copied') {
       setShared(true)
       setTimeout(() => setShared(false), 1500)
-    } catch {
-      // clipboard non disponibile: nessuna azione, l'utente vede comunque il codice nell'header
+    }
+  }
+
+  // Recovery sociale: chiunque nella stanza può generare e condividere il
+  // link di recupero di un membro (anche il proprio, come backup) — non
+  // serve un account per farlo, basta vedere la lista partecipanti.
+  async function shareRecoveryLink(member: Member) {
+    const token = encodeResumeToken({ roomId: room.id, memberId: member.id, inviteCode: room.invite_code })
+    const url = `${window.location.origin}/resume/${token}`
+    const result = await shareOrCopy({
+      title: 'Link di recupero',
+      text: `Link di recupero per ${member.display_name} su "${room.title}"`,
+      url,
+    })
+    if (result === 'copied') {
+      setRecoveryCopiedFor(member.id)
+      setTimeout(() => setRecoveryCopiedFor(null), 1500)
     }
   }
 
@@ -104,7 +112,16 @@ export default function StanzaTab({
                   {m.id === currentMember.id && <span className="text-muted"> (tu)</span>}
                 </span>
               </div>
-              <span className="font-mono text-[10px] text-muted">{roleLabel(m.id, cars, carPassengers)}</span>
+              <div className="flex items-center gap-2.5">
+                <span className="font-mono text-[10px] text-muted">{roleLabel(m.id, cars, carPassengers)}</span>
+                <button
+                  onClick={() => shareRecoveryLink(m)}
+                  title={`Link di recupero per ${m.display_name}`}
+                  className="text-muted transition-colors active:text-teal"
+                >
+                  {recoveryCopiedFor === m.id ? <Check size={14} className="text-teal" /> : <LifeBuoy size={14} />}
+                </button>
+              </div>
             </div>
           ))}
         </div>

@@ -9,6 +9,7 @@ import { queryClient } from './lib/queryClient'
 import CrewPage from './pages/Crew'
 import Home from './pages/Home'
 import Join from './pages/Join'
+import Resume from './pages/Resume'
 import RoomPage from './pages/Room'
 
 // Osservabilità in DEV: segnala in console le tabelle attese ma assenti sul DB.
@@ -25,6 +26,7 @@ createRoot(document.getElementById('root')!).render(
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/join/:inviteCode" element={<Join />} />
+          <Route path="/resume/:token" element={<Resume />} />
           <Route path="/crew/:crewId" element={<CrewPage />} />
           <Route path="/room/:roomId" element={<RoomPage />} />
         </Routes>
