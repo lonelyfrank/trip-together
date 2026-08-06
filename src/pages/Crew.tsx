@@ -6,6 +6,7 @@ import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
 import ScreenHeader from '../components/ui/ScreenHeader'
+import { SkeletonCard, SkeletonHeader } from '../components/ui/Skeleton'
 import { useCrewData } from '../hooks/useCrewData'
 import { getMyName, getSavedCrewEntry } from '../lib/localRooms'
 import { createRoomAndJoin, joinRoomAsMember } from '../lib/membership'
@@ -35,7 +36,15 @@ export default function CrewPage() {
   const entry = crewId ? getSavedCrewEntry(crewId) : null
 
   if (isLoading) {
-    return <div className="flex min-h-svh items-center justify-center bg-ink text-muted">Caricamento...</div>
+    return (
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink">
+        <SkeletonHeader />
+        <div className="flex-1 space-y-2.5 px-4 pb-10 sm:px-6">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      </div>
+    )
   }
 
   if (loadError) {

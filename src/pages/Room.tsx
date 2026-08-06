@@ -9,6 +9,7 @@ import StanzaTab from '../components/room/StanzaTab'
 import TabBar, { type RoomTabId } from '../components/TabBar'
 import Chip from '../components/ui/Chip'
 import ScreenHeader from '../components/ui/ScreenHeader'
+import { Skeleton, SkeletonCard, SkeletonHeader } from '../components/ui/Skeleton'
 import { useRoomData } from '../hooks/useRoomData'
 import { query } from '../lib/db'
 import { getSavedRoomEntry } from '../lib/localRooms'
@@ -66,7 +67,16 @@ export default function RoomPage() {
   } = useRoomData(checkedMembership ? roomId : undefined)
 
   if (!checkedMembership || isLoading) {
-    return <div className="flex min-h-svh items-center justify-center bg-ink text-muted">Caricamento...</div>
+    return (
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink">
+        <Skeleton className="mx-4 mt-3 h-3 w-24 sm:mx-6" />
+        <SkeletonHeader />
+        <div className="flex-1 space-y-2.5 px-4 pb-10 sm:px-6">
+          <SkeletonCard />
+          <SkeletonCard />
+        </div>
+      </div>
+    )
   }
 
   // Errore di lettura (es. tabella mancante) ≠ stanza inesistente: stato distinto.
