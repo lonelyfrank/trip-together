@@ -51,7 +51,7 @@ export default function CrewPage() {
     return (
       <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
         <p className="text-coral">Errore nel caricamento della comitiva.</p>
-        <p className="font-mono text-[11px] text-muted">{loadError.message}</p>
+        <p className="font-mono text-[11px] text-muted">Controlla la connessione e riprova.</p>
         <button onClick={() => window.location.reload()} className="text-sm text-cream underline">
           Riprova
         </button>
@@ -81,7 +81,8 @@ export default function CrewPage() {
       const roomId = await createRoomAndJoin(title, myName, crewId)
       navigate(`/room/${roomId}`)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore imprevisto')
+      console.error('[creazione evento comitiva]', err)
+      setError('Non riusciamo a creare l’evento. Riprova tra un momento.')
     } finally {
       setSubmitting(false)
     }
@@ -91,10 +92,11 @@ export default function CrewPage() {
     // I membri della comitiva entrano negli eventi senza passare dal form codice.
     try {
       await joinRoomAsMember(roomId, inviteCode, myName)
-    } catch {
-      // se l'inserimento fallisce (es. già membro con vincolo) si prova comunque a entrare
+      navigate(`/room/${roomId}`)
+    } catch (err) {
+      console.error('[ingresso evento comitiva]', err)
+      setError('Non riusciamo ad aprire l’evento. Potrebbe essere archiviato: chiedi un link di recupero a chi partecipava.')
     }
-    navigate(`/room/${roomId}`)
   }
 
   async function invite() {
@@ -135,6 +137,7 @@ export default function CrewPage() {
       />
 
       <div className="flex-1 space-y-5 px-4 pb-28 sm:px-6">
+        {error && !creating && <p role="alert" className="text-sm text-coral">{error}</p>}
         <div>
           <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Partecipanti</p>
           <div className="flex flex-wrap gap-1.5">
@@ -199,7 +202,7 @@ export default function CrewPage() {
             <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Archiviati</p>
             <div className="space-y-2.5">
               {closedEvents.map((room) => (
-                <Card key={room.id} tone="flat" onClick={() => openEvent(room.id, room.invite_code)}>
+                <Card key={room.id} tone="flat" onClick={() => navigate(`/room/${room.id}`)}>
                   <p className="truncate text-[14px] text-cream">{room.title}</p>
                 </Card>
               ))}

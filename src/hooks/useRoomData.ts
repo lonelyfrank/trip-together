@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { firstError, query, rows, single } from '../lib/db'
-import { supabase } from '../lib/supabase'
+import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type {
   BoardLink,
   BoardNote,
@@ -90,6 +90,7 @@ const TABLES: { table: string; key: CollectionKey; pk: string[] }[] = [
 const BY_TABLE = new Map(TABLES.map((t) => [t.table, t]))
 
 async function fetchRoomData(id: string): Promise<RoomPayload> {
+  await ensureAnonymousSession()
   const [
     roomQ,
     membersQ,
@@ -229,15 +230,11 @@ export function useRoomData(roomId: string | undefined) {
       )
     }
 
-    // Alla RI-connessione del canale si può aver perso qualche evento: un solo
-    // refetch di riconciliazione come fallback (non ad ogni evento).
-    let wasSubscribed = false
-    channel.subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        if (wasSubscribed) invalidate()
-        wasSubscribed = true
-      }
-    })
+    // SUBSCRIBED precede talvolta l'ascolto effettivo della replica. Rileggiamo
+    // anche alla sua prima conferma per recuperare le modifiche in quel varco.
+    channel.on('system', {}, (payload) => {
+      if (payload.extension === 'postgres_changes' && payload.status === 'ok') void invalidate()
+    }).subscribe()
 
     // Rete di sicurezza incondizionata: il canale può restare "SUBSCRIBED"
     // senza però consegnare un evento specifico (drift di schema su un

@@ -1,10 +1,6 @@
-// Token di recupero L1: nessuna tabella nuova, nessuna migration. Il token è
-// il base64url di {roomId, memberId, inviteCode} — le stesse informazioni già
-// salvate in localRooms.ts per riconoscere "chi sono" in una stanza. Visitare
-// /resume/:token su un device nuovo (o dopo aver perso lo storage) ripristina
-// quella mappatura, verificando solo che il membro esista ancora nella
-// stanza. Coerente col modello attuale: le RLS sono permissive, l'accesso è
-// già scoped dall'id/invite-code non indovinabile, non da un segreto.
+// Il link contiene il codice invito: chi lo riceve può recuperare questo membro.
+// claim_member verifica il codice sul server e aggiunge il nuovo device senza
+// revocare l'accesso a quello originale. Base64url è un formato, non cifratura.
 
 export interface ResumePayload {
   roomId: string

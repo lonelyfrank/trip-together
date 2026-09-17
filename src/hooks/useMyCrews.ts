@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js'
 import { useQuery } from '@tanstack/react-query'
 import { query, rows } from '../lib/db'
 import { getSavedCrews } from '../lib/localRooms'
-import { supabase } from '../lib/supabase'
+import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type { Crew } from '../types'
 
 export interface CrewSummary {
@@ -19,6 +19,7 @@ interface MyCrewsPayload {
 async function fetchMyCrews(): Promise<MyCrewsPayload> {
   const entries = getSavedCrews()
   if (entries.length === 0) return { summaries: [], error: null }
+  await ensureAnonymousSession()
 
   const crewIds = entries.map((e) => e.crewId)
   const [crewsQ, membersQ, roomsQ] = await Promise.all([
@@ -29,7 +30,7 @@ async function fetchMyCrews(): Promise<MyCrewsPayload> {
     ),
     query<{ id: string; crew_id: string }[]>(
       'rooms.byCrews',
-      supabase.from('rooms').select('id, crew_id').in('crew_id', crewIds),
+      supabase.rpc('list_crew_events'),
     ),
   ])
 
@@ -49,6 +50,6 @@ async function fetchMyCrews(): Promise<MyCrewsPayload> {
 }
 
 export function useMyCrews() {
-  const { data, isLoading } = useQuery({ queryKey: ['my-crews'], queryFn: fetchMyCrews })
-  return { summaries: data?.summaries ?? [], isLoading, error: data?.error ?? null }
+  const { data, isLoading, error: queryError } = useQuery({ queryKey: ['my-crews'], queryFn: fetchMyCrews })
+  return { summaries: data?.summaries ?? [], isLoading, error: queryError ?? data?.error ?? null }
 }

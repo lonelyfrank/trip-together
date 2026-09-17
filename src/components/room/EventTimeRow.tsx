@@ -29,14 +29,14 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
         updateRoomEventTime(room.id, eventTimeIso),
       )
       if (err) {
-        setError(
-          /event_time/.test(err.message)
-            ? 'Manca la colonna event_time: esegui supabase/migrations/20260724000000_schema.sql su Supabase.'
-            : err.message,
-        )
+        console.error('[salvataggio data evento]', err)
+        setError('Non riusciamo a salvare la data. Riprova tra un momento.')
         return
       }
       setEditing(false)
+    } catch (err) {
+      console.error('[salvataggio data evento]', err)
+      setError('Non riusciamo a salvare la data. Controlla la connessione e riprova.')
     } finally {
       setSaving(false)
     }

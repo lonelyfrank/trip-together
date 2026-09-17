@@ -13,8 +13,8 @@
 
 -- ═══════════════════════════════════════════════════════════════════════
 -- Base schema: stanze/eventi, membri, auto, spese, bacheca, radar.
--- RLS permissiva (demo-grade): l'accesso è scoped dall'invite_code/id non
--- indovinabile in fase di validazione.
+-- Le policy permissive iniziali sono sostituite dal blocco Fix in fondo.
+-- Un invite_code/id non indovinabile non limita da solo l'accesso al DB.
 -- ═══════════════════════════════════════════════════════════════════════
 
 create extension if not exists pgcrypto;
@@ -414,3 +414,297 @@ begin
     execute format('alter table %I replica identity full', t);
   end loop;
 end $$;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Fix: appartenenza server-side, RLS scoped e RPC di ingresso atomiche.
+-- Applicare tutto il blocco insieme; il client passa alle RPC solo dopo
+-- conferma dell'applicazione. Il codice invito non limita le SELECT:
+-- l'isolamento è garantito dalle policy, non dai filtri del browser.
+-- ═══════════════════════════════════════════════════════════════════════
+begin;
+
+create table if not exists public.member_devices (
+  member_id uuid not null references public.members(id) on delete cascade,
+  auth_user_id uuid not null,
+  created_at timestamptz not null default now(),
+  primary key (member_id, auth_user_id)
+);
+create index if not exists idx_member_devices_user on public.member_devices(auth_user_id, member_id);
+create index if not exists idx_members_room_user on public.members(room_id, auth_user_id);
+
+create or replace function public.is_room_member(rid uuid) returns boolean
+language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.members m
+    left join public.member_devices d on d.member_id = m.id
+    where m.room_id = rid
+      and (m.auth_user_id = auth.uid() or d.auth_user_id = auth.uid())
+  )
+$$;
+create or replace function public.is_crew_member(cid uuid) returns boolean
+language sql security definer stable set search_path = public as $$
+  select exists (
+    select 1 from public.crew_members m
+    where m.crew_id = cid and m.auth_user_id = auth.uid()
+  )
+$$;
+
+-- Gli helper privati non sono RPC pubbliche: solo le funzioni sottostanti
+-- possono attribuire identità o creare gruppi usando i privilegi del proprietario.
+create or replace function public.tt_require_session() returns uuid
+language plpgsql security definer stable set search_path = public as $$
+declare v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Sessione non disponibile. Riapri l''app e riprova.' using errcode = '42501';
+  end if;
+  return v_uid;
+end $$;
+create or replace function public.tt_display_name(p_name text) returns text
+language plpgsql security definer immutable set search_path = public as $$
+declare v_name text := btrim(coalesce(p_name, ''));
+begin
+  if char_length(v_name) not between 1 and 40 then
+    raise exception 'Il nome deve contenere da 1 a 40 caratteri.' using errcode = '22023';
+  end if;
+  return v_name;
+end $$;
+create or replace function public.tt_invite_code() returns text
+language plpgsql security definer volatile set search_path = public as $$
+declare
+  v_alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_mask int := 1;
+  v_index int;
+  v_code text := '';
+begin
+  while v_mask < char_length(v_alphabet) - 1 loop v_mask := (v_mask << 1) | 1; end loop;
+  while char_length(v_code) < 7 loop
+    -- Il primo byte di un UUID casuale non contiene bit fissi di versione.
+    -- Maschera e rejection sampling restano uniformi cambiando alfabeto.
+    v_index := get_byte(uuid_send(gen_random_uuid()), 0) & v_mask;
+    if v_index < char_length(v_alphabet) then
+      v_code := v_code || substr(v_alphabet, v_index + 1, 1);
+    end if;
+  end loop;
+  return v_code;
+end $$;
+
+create or replace function public.resolve_invite(p_code text) returns jsonb
+language plpgsql security definer stable set search_path = public as $$
+declare v_code text := upper(btrim(coalesce(p_code, ''))); v_id uuid;
+begin
+  perform public.tt_require_session();
+  if char_length(v_code) between 1 and 64 then
+    select id into v_id from public.rooms where invite_code = v_code and status = 'open';
+    if found then return jsonb_build_object('kind', 'room', 'id', v_id); end if;
+    select id into v_id from public.crews where invite_code = v_code;
+    if found then return jsonb_build_object('kind', 'crew', 'id', v_id); end if;
+  end if;
+  return jsonb_build_object('kind', 'none', 'id', null);
+end $$;
+
+create or replace function public.join_room(p_room_id uuid, p_invite_code text, p_display_name text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := public.tt_require_session();
+  v_name text := public.tt_display_name(p_display_name);
+  v_member uuid;
+begin
+  -- Il lock serializza due ingressi dello stesso device prima dell'insert.
+  perform 1 from public.rooms where id = p_room_id and status = 'open'
+    and invite_code = upper(btrim(coalesce(p_invite_code, ''))) for update;
+  if not found then raise exception 'Invito non valido o evento non disponibile.' using errcode = '42501'; end if;
+  select m.id into v_member from public.members m
+    where m.room_id = p_room_id and (m.auth_user_id = v_uid or exists (
+      select 1 from public.member_devices d where d.member_id = m.id and d.auth_user_id = v_uid
+    )) order by m.created_at, m.id limit 1;
+  if v_member is null then
+    insert into public.members(room_id, display_name, auth_user_id, role)
+      values (p_room_id, v_name, v_uid, 'guest') returning id into v_member;
+  end if;
+  return v_member;
+end $$;
+
+create or replace function public.join_crew(p_crew_id uuid, p_invite_code text, p_display_name text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := public.tt_require_session();
+  v_name text := public.tt_display_name(p_display_name);
+  v_member uuid;
+begin
+  perform 1 from public.crews where id = p_crew_id
+    and invite_code = upper(btrim(coalesce(p_invite_code, ''))) for update;
+  if not found then raise exception 'Invito non valido o comitiva non disponibile.' using errcode = '42501'; end if;
+  select id into v_member from public.crew_members where crew_id = p_crew_id and auth_user_id = v_uid;
+  if v_member is null then
+    insert into public.crew_members(crew_id, display_name, auth_user_id, role)
+      values (p_crew_id, v_name, v_uid, 'member') returning id into v_member;
+  end if;
+  return v_member;
+end $$;
+
+create or replace function public.claim_member(p_member_id uuid, p_room_id uuid, p_invite_code text)
+returns text language plpgsql security definer set search_path = public as $$
+declare v_uid uuid := public.tt_require_session(); v_name text;
+begin
+  select m.display_name into v_name from public.members m
+    join public.rooms r on r.id = m.room_id
+    where m.id = p_member_id and r.id = p_room_id
+      and r.invite_code = upper(btrim(coalesce(p_invite_code, ''))) for update of r;
+  if not found then raise exception 'Link di recupero non valido.' using errcode = '42501'; end if;
+  insert into public.member_devices(member_id, auth_user_id)
+    values (p_member_id, v_uid) on conflict do nothing;
+  return v_name;
+end $$;
+
+create or replace function public.tt_create_group(p_kind text, p_title text, p_display_name text, p_crew_id uuid)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare
+  v_uid uuid := public.tt_require_session();
+  v_name text := public.tt_display_name(p_display_name);
+  v_title text := btrim(coalesce(p_title, ''));
+  v_code text; v_id uuid; v_member uuid; v_attempt int;
+begin
+  if p_kind is null or p_kind not in ('room', 'crew') or char_length(v_title) not between 1 and 80 then
+    raise exception 'Nome del gruppo non valido: usa da 1 a 80 caratteri.' using errcode = '22023';
+  end if;
+  if p_crew_id is not null and not public.is_crew_member(p_crew_id) then
+    raise exception 'Serve un invito per questa comitiva.' using errcode = '42501';
+  end if;
+  for v_attempt in 1..5 loop
+    v_code := public.tt_invite_code();
+    -- Il codice deve essere univoco anche fra stanze e comitive, non solo
+    -- dentro ogni tabella. Il lock protegge le due verifiche concorrenti.
+    perform pg_advisory_xact_lock(hashtextextended('tt:invite:' || v_code, 0));
+    if exists (select 1 from public.rooms where invite_code = v_code)
+      or exists (select 1 from public.crews where invite_code = v_code) then continue; end if;
+    begin
+      if p_kind = 'room' then
+        insert into public.rooms(invite_code, title, created_by, crew_id)
+          values (v_code, v_title, v_uid, p_crew_id) returning id into v_id;
+        insert into public.members(room_id, display_name, auth_user_id, role)
+          values (v_id, v_name, v_uid, 'creator') returning id into v_member;
+      else
+        insert into public.crews(invite_code, name, created_by)
+          values (v_code, v_title, v_uid) returning id into v_id;
+        insert into public.crew_members(crew_id, display_name, auth_user_id, role)
+          values (v_id, v_name, v_uid, 'creator') returning id into v_member;
+      end if;
+      return jsonb_build_object('id', v_id, 'member_id', v_member, 'invite_code', v_code);
+    exception when unique_violation then
+      -- Il sub-blocco annulla anche il gruppo se fallisce il suo membro.
+      if v_attempt = 5 then raise exception 'Creazione non riuscita. Riprova.' using errcode = '23505'; end if;
+    end;
+  end loop;
+  raise exception 'Creazione non riuscita. Riprova.' using errcode = '23505';
+end $$;
+create or replace function public.create_room_and_join(p_title text, p_display_name text, p_crew_id uuid default null)
+returns jsonb language sql security definer set search_path = public as $$
+  select public.tt_create_group('room', p_title, p_display_name, p_crew_id)
+$$;
+create or replace function public.create_crew(p_name text, p_display_name text)
+returns jsonb language sql security definer set search_path = public as $$
+  select public.tt_create_group('crew', p_name, p_display_name, null)
+$$;
+
+-- La comitiva deve poter elencare e invitare ai suoi eventi prima del join:
+-- un percorso autenticato dedicato evita di allargare la SELECT su rooms.
+create or replace function public.list_crew_events(p_crew_id uuid default null)
+returns setof public.rooms language sql security definer stable set search_path = public as $$
+  select r.* from public.rooms r
+  where (p_crew_id is null or r.crew_id = p_crew_id) and public.is_crew_member(r.crew_id)
+  order by r.created_at desc, r.id
+$$;
+
+-- Non fidarsi del room_id inviato dal browser: deve coincidere sempre
+-- con quello del parent, anche negli UPDATE e negli upsert.
+create or replace function public.set_room_id_from_car() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  select c.room_id into new.room_id from public.cars c where c.id = new.car_id;
+  if new.room_id is null then raise exception 'Auto non disponibile.' using errcode = '42501'; end if;
+  return new;
+end $$;
+create or replace function public.set_room_id_from_proposal() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  select p.room_id into new.room_id from public.stop_proposals p where p.id = new.proposal_id;
+  if new.room_id is null then raise exception 'Proposta non disponibile.' using errcode = '42501'; end if;
+  return new;
+end $$;
+create or replace function public.set_room_id_from_expense() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  select e.room_id into new.room_id from public.general_expenses e where e.id = new.expense_id;
+  if new.room_id is null then raise exception 'Spesa non disponibile.' using errcode = '42501'; end if;
+  return new;
+end $$;
+do $$
+declare t text;
+begin
+  foreach t in array array['car_passengers', 'car_expenses', 'car_cargo', 'delay_reports'] loop
+    execute format('drop trigger if exists trg_room_id on public.%I', t);
+    execute format('create trigger trg_room_id before insert or update on public.%I for each row execute function public.set_room_id_from_car()', t);
+    execute format('update public.%I c set room_id = p.room_id from public.cars p where c.car_id = p.id and c.room_id is distinct from p.room_id', t);
+  end loop;
+end $$;
+drop trigger if exists trg_room_id on public.stop_proposal_votes;
+create trigger trg_room_id before insert or update on public.stop_proposal_votes
+  for each row execute function public.set_room_id_from_proposal();
+drop trigger if exists trg_room_id on public.general_expense_participants;
+create trigger trg_room_id before insert or update on public.general_expense_participants
+  for each row execute function public.set_room_id_from_expense();
+update public.stop_proposal_votes v set room_id = p.room_id from public.stop_proposals p
+  where v.proposal_id = p.id and v.room_id is distinct from p.room_id;
+update public.general_expense_participants v set room_id = e.room_id from public.general_expenses e
+  where v.expense_id = e.id and v.room_id is distinct from e.room_id;
+
+-- Rimuovere tutte le policy precedenti: una sola permissiva rimasta
+-- combinerebbe il suo USING con OR e riaprirebbe l'intera tabella.
+do $$
+declare
+  t text; p record; v_scope text;
+  v_tables text[] := array['rooms','members','cars','car_passengers','car_expenses','car_cargo',
+    'delay_reports','general_expenses','general_expense_participants','board_notes','board_links',
+    'radar_positions','room_checklist_items','stop_proposals','stop_proposal_votes','ride_requests',
+    'crews','crew_members','member_devices'];
+begin
+  foreach t in array v_tables loop
+    execute format('alter table public.%I enable row level security', t);
+    for p in select policyname from pg_policies where schemaname = 'public' and tablename = t loop
+      execute format('drop policy if exists %I on public.%I', p.policyname, t);
+    end loop;
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
+    execute format('grant select on table public.%I to anon, authenticated', t);
+    if t = 'member_devices' then
+      execute 'create policy "member_devices: own" on public.member_devices for select to authenticated using (auth_user_id = auth.uid())';
+    else
+      v_scope := case t
+        when 'rooms' then 'public.is_room_member(id)'
+        when 'crews' then 'public.is_crew_member(id)'
+        when 'crew_members' then 'public.is_crew_member(crew_id)'
+        else 'public.is_room_member(room_id)' end;
+      execute format('create policy %I on public.%I for all to authenticated using (%s) with check (%s)', t || ': members', t, v_scope, v_scope);
+      execute format('grant insert, update, delete on table public.%I to authenticated', t);
+      execute format('alter table public.%I replica identity full', t);
+    end if;
+  end loop;
+end $$;
+
+-- Anche una sessione anonima Supabase usa il ruolo authenticated. Identità,
+-- ruoli e creazione passano solo dalle RPC; gli altri campi restano collaborativi.
+revoke insert, update, delete on public.rooms from anon, authenticated;
+grant update (title, destination_label, destination_lat, destination_lng, event_time, status) on public.rooms to authenticated;
+revoke insert, update, delete on public.members from anon, authenticated;
+grant update (display_name, confirmed, confirmed_at) on public.members to authenticated;
+revoke insert, update, delete on public.crews from anon, authenticated;
+grant update (name) on public.crews to authenticated;
+revoke insert, update, delete on public.crew_members from anon, authenticated;
+
+revoke execute on function public.tt_require_session(), public.tt_display_name(text), public.tt_invite_code(), public.tt_create_group(text,text,text,uuid) from public, anon, authenticated;
+revoke execute on function public.set_room_id_from_car(), public.set_room_id_from_proposal(), public.set_room_id_from_expense() from public, anon, authenticated;
+revoke execute on function public.is_room_member(uuid), public.is_crew_member(uuid), public.resolve_invite(text), public.join_room(uuid,text,text), public.join_crew(uuid,text,text), public.claim_member(uuid,uuid,text), public.create_room_and_join(text,text,uuid), public.create_crew(text,text), public.list_crew_events(uuid) from public;
+grant execute on function public.is_room_member(uuid), public.is_crew_member(uuid), public.resolve_invite(text), public.join_room(uuid,text,text), public.join_crew(uuid,text,text), public.claim_member(uuid,uuid,text), public.create_room_and_join(text,text,uuid), public.create_crew(text,text), public.list_crew_events(uuid) to anon, authenticated;
+
+notify pgrst, 'reload schema';
+commit;

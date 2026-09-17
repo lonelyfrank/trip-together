@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { saveRoomEntry, setMyName } from '../lib/localRooms'
+import { claimRoomMember } from '../lib/membership'
 import { decodeResumeToken } from '../lib/resumeToken'
-import { ensureAnonymousSession, supabase } from '../lib/supabase'
 
 type Status = 'checking' | 'invalid'
 
@@ -19,21 +18,13 @@ export default function Resume() {
     }
     let cancelled = false
     ;(async () => {
-      await ensureAnonymousSession()
-      const { data, error } = await supabase
-        .from('members')
-        .select('id, display_name')
-        .eq('id', payload.memberId)
-        .eq('room_id', payload.roomId)
-        .maybeSingle()
-      if (cancelled) return
-      if (error || !data) {
-        setStatus('invalid')
-        return
+      try {
+        await claimRoomMember(payload.roomId, payload.memberId, payload.inviteCode)
+        if (!cancelled) navigate(`/room/${payload.roomId}`, { replace: true })
+      } catch (error) {
+        console.error('[recupero partecipazione]', error)
+        if (!cancelled) setStatus('invalid')
       }
-      saveRoomEntry({ roomId: payload.roomId, memberId: payload.memberId, inviteCode: payload.inviteCode })
-      setMyName(data.display_name)
-      navigate(`/room/${payload.roomId}`, { replace: true })
     })()
     return () => {
       cancelled = true
@@ -43,7 +34,7 @@ export default function Resume() {
   if (status === 'invalid') {
     return (
       <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink px-6 py-10 text-center">
-        <p className="text-cream">Link di recupero non valido: il membro non esiste più in questa stanza.</p>
+        <p className="text-cream">Non riusciamo a recuperare la partecipazione. Controlla la connessione e il link ricevuto, poi riprova.</p>
         <button onClick={() => navigate('/')} className="mt-4 text-sm text-muted underline">
           Torna alla home
         </button>

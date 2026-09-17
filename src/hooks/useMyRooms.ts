@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js'
 import { useQuery } from '@tanstack/react-query'
 import { query, rows } from '../lib/db'
 import { getSavedRooms } from '../lib/localRooms'
-import { supabase } from '../lib/supabase'
+import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type { Room } from '../types'
 
 export interface RoomSummary {
@@ -23,6 +23,7 @@ interface MyRoomsPayload {
 async function fetchMyRooms(): Promise<MyRoomsPayload> {
   const entries = getSavedRooms()
   if (entries.length === 0) return { summaries: [], error: null }
+  await ensureAnonymousSession()
 
   const roomIds = entries.map((e) => e.roomId)
   const cutoff = new Date(Date.now() - RADAR_ACTIVE_WINDOW_MS).toISOString()
@@ -76,6 +77,6 @@ async function fetchMyRooms(): Promise<MyRoomsPayload> {
 }
 
 export function useMyRooms() {
-  const { data, isLoading } = useQuery({ queryKey: ['my-rooms'], queryFn: fetchMyRooms })
-  return { summaries: data?.summaries ?? [], isLoading, error: data?.error ?? null }
+  const { data, isLoading, error: queryError } = useQuery({ queryKey: ['my-rooms'], queryFn: fetchMyRooms })
+  return { summaries: data?.summaries ?? [], isLoading, error: queryError ?? data?.error ?? null }
 }

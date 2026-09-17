@@ -2,7 +2,7 @@ import type { PostgrestError } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { firstError, query, rows, single } from '../lib/db'
-import { supabase } from '../lib/supabase'
+import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type { Crew, CrewMember, Room } from '../types'
 
 interface CrewPayload {
@@ -18,12 +18,13 @@ const EMPTY_PAYLOAD: CrewPayload = { error: null, notFound: false, crew: null, m
 export const crewDataKey = (crewId: string) => ['crew-data', crewId] as const
 
 async function fetchCrewData(id: string): Promise<CrewPayload> {
+  await ensureAnonymousSession()
   const [crewQ, membersQ, eventsQ] = await Promise.all([
     query<Crew>('crews.byId', supabase.from('crews').select('*').eq('id', id).maybeSingle()),
     query<CrewMember[]>('crew_members.byCrew', supabase.from('crew_members').select('*').eq('crew_id', id)),
     query<Room[]>(
       'rooms.byCrew',
-      supabase.from('rooms').select('*').eq('crew_id', id).order('created_at', { ascending: false }),
+      supabase.rpc('list_crew_events', { p_crew_id: id }),
     ),
   ])
 
@@ -40,7 +41,7 @@ async function fetchCrewData(id: string): Promise<CrewPayload> {
 export function useCrewData(crewId: string | undefined) {
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: queryError } = useQuery({
     queryKey: crewId ? crewDataKey(crewId) : ['crew-data', 'none'],
     queryFn: () => fetchCrewData(crewId!),
     enabled: !!crewId,
@@ -59,12 +60,17 @@ export function useCrewData(crewId: string | undefined) {
         invalidate,
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'rooms', filter: `crew_id=eq.${crewId}` }, invalidate)
-      .subscribe()
+
+    let cancelled = false
+    void ensureAnonymousSession().then(() => {
+      if (!cancelled) channel.subscribe()
+    }).catch((error) => console.error('[realtime comitiva]', error))
 
     return () => {
+      cancelled = true
       supabase.removeChannel(channel)
     }
   }, [crewId, queryClient])
 
-  return { isLoading: !!crewId && isLoading, ...(data ?? EMPTY_PAYLOAD) }
+  return { isLoading: !!crewId && isLoading, ...(data ?? EMPTY_PAYLOAD), error: queryError ?? data?.error ?? null }
 }

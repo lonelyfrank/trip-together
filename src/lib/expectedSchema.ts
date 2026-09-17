@@ -8,6 +8,7 @@ export const EXPECTED_TABLES = [
   'crew_members',
   'rooms',
   'members',
+  'member_devices',
   'cars',
   'car_passengers',
   'car_expenses',
@@ -29,5 +30,6 @@ export type ExpectedTable = (typeof EXPECTED_TABLES)[number]
 // Colonna usata per il probe di esistenza: alcune tabelle non hanno `id`.
 export const PROBE_COLUMN: Record<string, string> = {
   radar_positions: 'member_id',
+  member_devices: 'member_id',
   stop_proposal_votes: 'proposal_id',
 }

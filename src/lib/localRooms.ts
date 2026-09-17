@@ -1,6 +1,5 @@
-// Livello 0 identità: nessun account, quindi il device deve ricordarsi da solo
-// a quali stanze/comitive appartiene e con quale id-membro. Nessun dato
-// sensibile, solo id/nomi già pubblici all'interno della stanza/comitiva.
+// Preferenze di navigazione del device. I codici sono segreti di invito;
+// l'autorizzazione effettiva dipende dalla sessione e dalle RLS sul server.
 
 const ROOMS_KEY = 'tripTogether:rooms'
 const CREWS_KEY = 'tripTogether:crews'

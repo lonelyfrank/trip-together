@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ArchiveSummary from '../components/room/ArchiveSummary'
 import Button from '../components/ui/Button'
@@ -13,10 +13,9 @@ import Chip from '../components/ui/Chip'
 import ScreenHeader from '../components/ui/ScreenHeader'
 import { Skeleton, SkeletonCard, SkeletonHeader } from '../components/ui/Skeleton'
 import { useRoomData } from '../hooks/useRoomData'
-import { query } from '../lib/db'
-import { getSavedRoomEntry } from '../lib/localRooms'
+import { getSavedRoomEntry, saveRoomEntry } from '../lib/localRooms'
 import { roomPhase, type RoomPhase } from '../lib/phase'
-import { supabase } from '../lib/supabase'
+import { ensureAnonymousSession, supabase } from '../lib/supabase'
 
 const PHASE_EYEBROW: Record<RoomPhase, string> = {
   pre: 'Evento in programma',
@@ -33,30 +32,46 @@ export default function RoomPage() {
   function setTab(nextTab: RoomTabId) {
     setSearchParams((previous) => { const next = new URLSearchParams(previous); next.set('tab', nextTab); return next })
   }
-  const [checkedRoomId, setCheckedRoomId] = useState<string | null>(null)
-  const checkedMembership = checkedRoomId === roomId
+  const entry = useMemo(() => roomId ? getSavedRoomEntry(roomId) : null, [roomId])
+  const [identity, setIdentity] = useState<{ roomId: string; userId: string; memberIds: string[] } | null>(null)
+  const [accessError, setAccessError] = useState(false)
+  const [accessAttempt, setAccessAttempt] = useState(0)
+  const [inviteCode, setInviteCode] = useState('')
+  const checkedMembership = identity?.roomId === roomId
 
   useEffect(() => {
     if (!roomId) return
-    const entry = getSavedRoomEntry(roomId)
-    if (entry) {
-      setCheckedRoomId(roomId)
-      return
-    }
-
     let cancelled = false
-    query<{ invite_code: string }>(
-      'rooms.inviteCodeById',
-      supabase.from('rooms').select('invite_code').eq('id', roomId).maybeSingle(),
-    ).then((res) => {
-      if (cancelled) return
-      if (res.kind === 'ok') navigate(`/join/${res.data.invite_code}`, { replace: true })
-      else setCheckedRoomId(roomId) // stanza inesistente o errore: gestita dallo stato "notFound"/error
-    }).catch(() => { if (!cancelled) setCheckedRoomId(roomId) })
+    setAccessError(false)
+    setIdentity(null)
+    void (async () => {
+      try {
+        const session = await ensureAnonymousSession()
+        const { data: devices, error } = await supabase.from('member_devices')
+          .select('member_id').eq('auth_user_id', session.user.id)
+        if (error) throw error
+        if (!cancelled) setIdentity({ roomId, userId: session.user.id, memberIds: (devices ?? []).map((d) => d.member_id) })
+      } catch (error) {
+        console.error('[accesso evento]', error)
+        if (!cancelled) setAccessError(true)
+      }
+    })()
     return () => { cancelled = true }
-  }, [roomId, navigate])
+  }, [roomId, accessAttempt])
 
   const data = useRoomData(checkedMembership ? roomId : undefined)
+  const ownMembers = data.members.filter((m) => m.auth_user_id === identity?.userId || identity?.memberIds.includes(m.id))
+  const currentMember = ownMembers.find((m) => m.id === entry?.memberId) ?? ownMembers[0]
+  const restoredRoomId = data.room?.id
+  const restoredCode = data.room?.invite_code
+  const restoredMemberId = currentMember?.id
+  useEffect(() => {
+    // Ripristina la navigazione locale solo dopo la lettura consentita dalle RLS.
+    if (restoredRoomId && restoredCode && restoredMemberId) {
+      saveRoomEntry({ roomId: restoredRoomId, memberId: restoredMemberId, inviteCode: restoredCode })
+    }
+  }, [restoredRoomId, restoredCode, restoredMemberId])
+
   const {
     sectionErrors,
     refetch,
@@ -80,7 +95,7 @@ export default function RoomPage() {
     rideRequests,
   } = data
 
-  if (!checkedMembership || isLoading) {
+  if ((!checkedMembership && !accessError) || isLoading) {
     return (
       <div className="mx-auto flex min-h-svh max-w-4xl flex-col bg-ink">
         <Skeleton className="mx-4 mt-3 h-3 w-24 sm:mx-6" />
@@ -94,12 +109,12 @@ export default function RoomPage() {
   }
 
   // Errore di lettura (es. tabella mancante) ≠ stanza inesistente: stato distinto.
-  if (error) {
+  if (error || accessError) {
     return (
       <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
         <p className="text-coral">Non riusciamo a caricare questo evento.</p>
         <p className="text-sm text-muted">Controlla la connessione e riprova.</p>
-        <button onClick={() => void refetch()} className="text-sm text-cream underline">
+        <button onClick={() => accessError ? setAccessAttempt((n) => n + 1) : void refetch()} className="text-sm text-cream underline">
           Riprova
         </button>
       </div>
@@ -109,7 +124,17 @@ export default function RoomPage() {
   if (!room) {
     return (
       <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
-        <p className="text-cream">Evento non trovato.</p>
+        <h1 className="font-serif text-2xl text-cream">Serve un invito per aprire questo evento</h1>
+        <form className="flex w-full max-w-sm flex-col gap-3" onSubmit={(event) => {
+          event.preventDefault()
+          if (inviteCode.trim()) navigate(`/join/${encodeURIComponent(inviteCode.trim().toUpperCase())}`)
+        }}>
+          <label htmlFor="event-invite" className="text-sm text-muted">Codice invito</label>
+          <input id="event-invite" required maxLength={64} autoCapitalize="characters" autoComplete="off"
+            value={inviteCode} onChange={(event) => setInviteCode(event.target.value)}
+            className="rounded-lg border border-border-soft bg-surface px-3 py-3 text-cream" />
+          <Button type="submit" disabled={!inviteCode.trim()}>Continua con il codice</Button>
+        </form>
         <button onClick={() => navigate('/')} className="text-sm text-muted underline">
           Torna alla home
         </button>
@@ -117,8 +142,6 @@ export default function RoomPage() {
     )
   }
 
-  const entry = getSavedRoomEntry(room.id)
-  const currentMember = members.find((m) => m.id === entry?.memberId)
   const sectionError = tab === 'stanza' ? null : sectionErrors[tab]
   const dataIncomplete = !!(sectionErrors.auto || sectionErrors.spese)
     || generalExpenses.some((expense) => !expense.waived && (!expense.paid_by_member_id || !generalExpenseParticipants.some((participant) => participant.expense_id === expense.id)))

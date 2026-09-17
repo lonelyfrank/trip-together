@@ -15,10 +15,12 @@ export default function Join() {
 
   useEffect(() => {
     if (!inviteCode) return
+    setResolved(null)
+    setError(null)
     let cancelled = false
     resolveInviteCode(inviteCode)
       .then((r) => !cancelled && setResolved(r))
-      .catch(() => !cancelled && setResolved({ type: 'none' }))
+      .catch((err) => { console.error('[verifica invito]', err); if (!cancelled) setError('Non riusciamo a verificare l’invito. Controlla la connessione e riprova.') })
     return () => {
       cancelled = true
     }
@@ -38,10 +40,15 @@ export default function Join() {
         navigate(`/crew/${resolved.id}`)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Errore imprevisto')
+      console.error('[ingresso]', err)
+      setError('Non riusciamo a completare l’ingresso. Controlla l’invito e riprova.')
     } finally {
       setSubmitting(false)
     }
+  }
+
+  if (resolved === null && error) {
+    return <div className="mx-auto flex min-h-svh max-w-lg flex-col justify-center gap-4 px-6 text-center"><p role="alert">{error}</p><Button onClick={() => window.location.reload()}>Riprova</Button></div>
   }
 
   if (resolved === null) {
@@ -71,6 +78,9 @@ export default function Join() {
         {error && <p className="rounded-xl bg-coral/10 px-4 py-2 text-sm text-coral">{error}</p>}
         <input
           autoFocus
+          required
+          maxLength={40}
+          aria-label="Il tuo nome"
           className="rounded-lg border border-border-soft bg-surface px-3 py-2.5 text-cream placeholder:text-muted"
           placeholder="Il tuo nome"
           value={name}

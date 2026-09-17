@@ -32,10 +32,76 @@ Opzioni lasciate disabilitate come richiesto, misurate separatamente dopo la fas
 - `noUncheckedIndexedAccess`: 14 diagnostiche TypeScript.
 - `exactOptionalPropertyTypes`: 4 diagnostiche TypeScript.
 
-## Fasi successive
+## Fase 1 — completata dopo conferma dell’applicazione SQL
 
-Fase 1: preparazione del blocco SQL RLS/RPC; nessuna modifica client dipendente
-prima della conferma dell'utente. Le verifiche sul database e sugli eventi realtime
-INSERT/UPDATE/DELETE devono ancora essere eseguite dopo l'applicazione.
+Applicazione manuale confermata dall'utente con «applicata». Il blocco
+`Fix: appartenenza server-side, RLS scoped e RPC di ingresso atomiche`
+e il client fanno parte dello stesso commit di fase.
+
+- `member_devices`, helper di appartenenza senza ricorsione RLS e policy scoped.
+- SELECT senza appartenenza: nessuna riga; nessun endpoint pubblico per recuperare
+  l'invito a partire dall'UUID. Scritture anagrafiche e modifiche a identità/ruoli
+  limitate alle RPC; revocata DELETE delle stanze anche ad `authenticated`, ruolo
+  usato dalle sessioni anonime Supabase.
+- RPC `resolve_invite`, `join_room`, `join_crew`, `claim_member`,
+  `create_room_and_join`, `create_crew`; input validati e helper non pubblici.
+- Creazione atomica con codici casuali di 7 caratteri, rejection sampling e
+  massimo 5 tentativi; lock per evitare collisioni anche fra stanze e comitive.
+- `list_crew_events`: lettura dei soli eventi delle proprie comitive, per
+  conservarne la scoperta prima del join senza allargare le policy su rooms.
+- Trigger che derivano sempre il room_id dal parent anche negli UPDATE:
+  una policy sul room_id denormalizzato non può fidarsi del valore del client.
+- Il blocco usa una transazione, oggetti con `if not exists`, funzioni
+  `create or replace`, rimozione/ricreazione delle policy e dei trigger e grant
+  ripetibili. Le funzioni pubbliche revocano EXECUTE a PUBLIC; quelle private
+  lo revocano anche ai ruoli client.
+
+### Client e verifiche del 17 settembre 2026
+
+- Creazione, ingresso, risoluzione e recupero passano per le RPC. La sessione è
+  non-null e condivisa fra richieste concorrenti, anche in StrictMode.
+- Nessuna risoluzione pubblica UUID → codice. Stato neutro con campo invito;
+  ripristino della voce locale solo dopo la verifica di appartenenza server.
+- Recupero additivo: secondo device e device originale possono entrambi scrivere.
+- Liste comitive via `list_crew_events`; l'accesso alle collezioni dell'evento
+  richiede comunque il join. Errori di ingresso/data in italiano, dettagli in console.
+- `npm run check && npm test && npm run build`: superato (7 file di test).
+- `scripts/uiSmoke.mjs`: superato con Chromium e API simulate, senza errori JS.
+- `scripts/verifyMembership.mjs`: superato sul Supabase configurato e nel browser
+  locale. Usa soltanto anon key/sessioni anonime, mai chiavi amministrative.
+
+Verifica 1e reale:
+
+| Prova | Esito |
+| --- | --- |
+| 16 letture della stanza | Tutte riuscite; nessun errore nelle sezioni UI |
+| Realtime INSERT | Ricevuto sul canale filtrato e visibile in bacheca |
+| Realtime UPDATE | Ricevuto sul canale filtrato e visibile in bacheca |
+| Realtime DELETE | Ricevuto sul canale filtrato e su quello diagnostico non filtrato; rimosso dalla bacheca |
+| Sessione estranea e anon key senza sessione | rooms/radar_positions restituiscono [] |
+| Scrittura estranea, invito errato, DELETE stanza | Respinti dal server |
+| Invito, join e comitiva | E2E riuscito; join ripetuto non duplica il membro né cambia il ruolo |
+| /resume/:token | E2E riuscito; conferma presenza dal device recuperato |
+| Sessione originale dopo recupero | Lettura e scrittura ancora consentite |
+| Recupero senza voce localStorage | Membro ricostruito dal mapping server |
+
+Il primo test scriveva subito dopo `SUBSCRIBED` e non riceveva INSERT. Ripetendo
+la prova dopo la conferma `system` della replica, tutti e tre gli eventi sono
+arrivati. Il client ora riconcilia la cache anche alla prima conferma PostgreSQL,
+chiudendo il varco fra il fetch iniziale e l'effettivo ascolto del canale.
+Riferimento: [Supabase — Postgres Changes troubleshooting](https://supabase.com/docs/guides/troubleshooting/realtime-postgres-changes-troubleshooting).
+
+I tre tentativi di verifica hanno creato comitive/eventi isolati, accessibili solo
+alle sessioni di test. Note e posizioni fittizie sono state eliminate; gli eventi
+sono archiviati. Comitive, eventi archiviati e membri restano perché le RPC non
+prevedono la cancellazione amministrativa di queste entità.
+
+Non è stato eseguito alcun DDL, neppure su un database locale. La rieseguibilità
+SQL è stata revisionata staticamente; non è certificata da una doppia applicazione
+reale. Il vincolo dell'utente impedisce di eseguire tale prova autonomamente.
+Le scelte dei punti 4d (atomicità), 4e (sessione non-null), 3d (lettura locale
+memoizzata) sono già realizzate in questa fase perché necessarie al nuovo accesso.
+
+## Fasi successive
 
 Fasi 2–5: da implementare, con gli ulteriori punti di conferma SQL previsti dal piano.

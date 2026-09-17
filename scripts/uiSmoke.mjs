@@ -18,6 +18,7 @@ async function context(fixture=false) {
     const req=route.request(), url=new URL(req.url()), table=url.pathname.split('/').pop(), method=req.method();
     state.requests.push({table,method});
     if(table===state.failTable || table==='general_expense_participants' && method==='POST' && state.failParticipants) return route.fulfill({status:500,json:{message:'Simulated error',code:'TEST'}});
+    if(url.pathname.includes('/auth/')) return route.fulfill({json:{access_token:'mock-token',refresh_token:'mock-refresh',expires_in:3600,token_type:'bearer',user:{id:'user',aud:'authenticated',role:'authenticated'}}});
     if(!fixture) return route.fulfill({json:[]});
     if(method==='PATCH') {
       const values=req.postDataJSON();

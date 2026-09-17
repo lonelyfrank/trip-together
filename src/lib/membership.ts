@@ -1,133 +1,84 @@
-import { getSavedRoomEntry, saveCrewEntry, saveRoomEntry, setMyName } from './localRooms'
+import { saveCrewEntry, saveRoomEntry, setMyName } from './localRooms'
 import { queryClient } from './queryClient'
-import { generateRoomCode } from './roomCode'
 import { ensureAnonymousSession, supabase } from './supabase'
 
-// Le liste in Home/Crew vivono nella cache TanStack Query: dopo aver creato o
-// aggiunto una stanza/comitiva le invalidiamo così si aggiornano subito.
-function invalidateMyRooms() {
-  queryClient.invalidateQueries({ queryKey: ['my-rooms'] })
+// L'appartenenza viene verificata dal server anche quando il device conserva
+// una voce locale: localStorage ricorda la navigazione, non concede accesso.
+async function membershipRpc<T>(name: string, params: Record<string, unknown>): Promise<T> {
+  await ensureAnonymousSession()
+  const { data, error } = await supabase.rpc(name, params)
+  if (error) throw error
+  if (data == null) throw new Error('Il server non ha confermato la partecipazione.')
+  return data as T
 }
-function invalidateMyCrews() {
-  queryClient.invalidateQueries({ queryKey: ['my-crews'] })
-}
 
-// Workflow condiviso di ingresso: garantisce la sessione anonima, crea/aggancia
-// lo slot-membro, ricorda nome, stanze e comitive sul device. Un posto solo per
-// tutta la logica, usato da Home, Join, Crew.
+type CreatedGroup = { id: string; member_id: string; invite_code: string }
 
-// ─── Eventi/stanze ──────────────────────────────────────────────────────
-
-/** Crea una nuova stanza (opzionalmente dentro una comitiva), entra come creatore. */
 export async function createRoomAndJoin(title: string, displayName: string, crewId?: string): Promise<string> {
-  const session = await ensureAnonymousSession()
-  const userId = session!.user.id
-  const inviteCode = generateRoomCode()
-
-  const payload: Record<string, unknown> = { invite_code: inviteCode, title: title.trim(), created_by: userId }
-  if (crewId) payload.crew_id = crewId
-
-  const { data: room, error: roomError } = await supabase.from('rooms').insert(payload).select().single()
-  if (roomError) throw roomError
-
-  const { data: member, error: memberError } = await supabase
-    .from('members')
-    .insert({ room_id: room.id, display_name: displayName.trim(), auth_user_id: userId, role: 'creator' })
-    .select()
-    .single()
-  if (memberError) throw memberError
-
-  setMyName(displayName.trim())
-  saveRoomEntry({ roomId: room.id, memberId: member.id, inviteCode })
-  invalidateMyRooms()
-  if (crewId) queryClient.invalidateQueries({ queryKey: ['crew-data', crewId] })
+  const room = await membershipRpc<CreatedGroup>('create_room_and_join', {
+    p_title: title, p_display_name: displayName, p_crew_id: crewId ?? null,
+  })
+  setMyName(displayName)
+  saveRoomEntry({ roomId: room.id, memberId: room.member_id, inviteCode: room.invite_code })
+  await queryClient.invalidateQueries({ queryKey: ['my-rooms'] })
+  if (crewId) {
+    await queryClient.invalidateQueries({ queryKey: ['crew-data', crewId] })
+    await queryClient.invalidateQueries({ queryKey: ['my-crews'] })
+  }
   return room.id
 }
 
-/** Entra come membro in una stanza già esistente (usato per gli eventi di una comitiva). */
 export async function joinRoomAsMember(roomId: string, inviteCode: string, displayName: string): Promise<void> {
-  if (getSavedRoomEntry(roomId)) return // già membro su questo device
-  const session = await ensureAnonymousSession()
-  const userId = session!.user.id
-
-  const { data: member, error } = await supabase
-    .from('members')
-    .insert({ room_id: roomId, display_name: displayName.trim(), auth_user_id: userId, role: 'guest' })
-    .select()
-    .single()
-  if (error) throw error
-
-  setMyName(displayName.trim())
-  saveRoomEntry({ roomId, memberId: member.id, inviteCode })
-  invalidateMyRooms()
+  const memberId = await membershipRpc<string>('join_room', {
+    p_room_id: roomId, p_invite_code: inviteCode, p_display_name: displayName,
+  })
+  setMyName(displayName)
+  saveRoomEntry({ roomId, memberId, inviteCode: inviteCode.trim().toUpperCase() })
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['my-rooms'] }),
+    queryClient.invalidateQueries({ queryKey: ['room-data', roomId] }),
+  ])
 }
 
-// ─── Comitive ─────────────────────────────────────────────────────────────
-
-/** Crea una comitiva, entra come creatore, ritorna l'id comitiva. */
 export async function createCrew(name: string, displayName: string): Promise<string> {
-  const session = await ensureAnonymousSession()
-  const userId = session!.user.id
-  const inviteCode = generateRoomCode()
-
-  const { data: crew, error: crewError } = await supabase
-    .from('crews')
-    .insert({ invite_code: inviteCode, name: name.trim(), created_by: userId })
-    .select()
-    .single()
-  if (crewError) throw crewError
-
-  const { data: member, error: memberError } = await supabase
-    .from('crew_members')
-    .insert({ crew_id: crew.id, display_name: displayName.trim(), auth_user_id: userId, role: 'creator' })
-    .select()
-    .single()
-  if (memberError) throw memberError
-
-  setMyName(displayName.trim())
-  saveCrewEntry({ crewId: crew.id, crewMemberId: member.id, inviteCode })
-  invalidateMyCrews()
+  const crew = await membershipRpc<CreatedGroup>('create_crew', { p_name: name, p_display_name: displayName })
+  setMyName(displayName)
+  saveCrewEntry({ crewId: crew.id, crewMemberId: crew.member_id, inviteCode: crew.invite_code })
+  await queryClient.invalidateQueries({ queryKey: ['my-crews'] })
   return crew.id
 }
 
-/** Entra come membro in una comitiva esistente (idempotente per device). */
 export async function joinCrewAsMember(crewId: string, inviteCode: string, displayName: string): Promise<void> {
-  const session = await ensureAnonymousSession()
-  const userId = session!.user.id
-
-  const { data: member, error } = await supabase
-    .from('crew_members')
-    .upsert(
-      { crew_id: crewId, display_name: displayName.trim(), auth_user_id: userId, role: 'member' },
-      { onConflict: 'crew_id,auth_user_id' },
-    )
-    .select()
-    .single()
-  if (error) throw error
-
-  setMyName(displayName.trim())
-  saveCrewEntry({ crewId, crewMemberId: member.id, inviteCode })
-  invalidateMyCrews()
-  queryClient.invalidateQueries({ queryKey: ['crew-data', crewId] })
+  const crewMemberId = await membershipRpc<string>('join_crew', {
+    p_crew_id: crewId, p_invite_code: inviteCode, p_display_name: displayName,
+  })
+  setMyName(displayName)
+  saveCrewEntry({ crewId, crewMemberId, inviteCode: inviteCode.trim().toUpperCase() })
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['my-crews'] }),
+    queryClient.invalidateQueries({ queryKey: ['crew-data', crewId] }),
+  ])
 }
 
-// ─── Risoluzione codice invito (stanza o comitiva) ─────────────────────────
+export async function claimRoomMember(roomId: string, memberId: string, inviteCode: string): Promise<void> {
+  const displayName = await membershipRpc<string>('claim_member', {
+    p_room_id: roomId, p_member_id: memberId, p_invite_code: inviteCode,
+  })
+  saveRoomEntry({ roomId, memberId, inviteCode })
+  setMyName(displayName)
+  await Promise.all([
+    queryClient.invalidateQueries({ queryKey: ['my-rooms'] }),
+    queryClient.invalidateQueries({ queryKey: ['room-data', roomId] }),
+  ])
+}
 
 export type ResolvedInvite =
-  | { type: 'room'; id: string; inviteCode: string }
-  | { type: 'crew'; id: string; inviteCode: string }
+  | { type: 'room' | 'crew'; id: string; inviteCode: string }
   | { type: 'none' }
 
-/** Un codice può appartenere a una stanza o a una comitiva: qui si capisce quale. */
 export async function resolveInviteCode(inviteCode: string): Promise<ResolvedInvite> {
-  await ensureAnonymousSession()
   const code = inviteCode.trim().toUpperCase()
-
-  const { data: room } = await supabase.from('rooms').select('id').eq('invite_code', code).maybeSingle()
-  if (room) return { type: 'room', id: room.id, inviteCode: code }
-
-  const { data: crew } = await supabase.from('crews').select('id').eq('invite_code', code).maybeSingle()
-  if (crew) return { type: 'crew', id: crew.id, inviteCode: code }
-
-  return { type: 'none' }
+  const result = await membershipRpc<{ kind: 'room' | 'crew' | 'none'; id: string | null }>('resolve_invite', { p_code: code })
+  if (result.kind === 'none' || !result.id) return { type: 'none' }
+  return { type: result.kind, id: result.id, inviteCode: code }
 }
