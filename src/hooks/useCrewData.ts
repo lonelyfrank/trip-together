@@ -21,10 +21,10 @@ async function fetchCrewData(id: string): Promise<CrewPayload> {
   await ensureAnonymousSession()
   const [crewQ, membersQ, eventsQ] = await Promise.all([
     query<Crew>('crews.byId', supabase.from('crews').select('*').eq('id', id).maybeSingle()),
-    query<CrewMember[]>('crew_members.byCrew', supabase.from('crew_members').select('*').eq('crew_id', id)),
+    query<CrewMember[]>('crew_members.byCrew', supabase.from('crew_members').select('*').eq('crew_id', id).order('created_at').order('id')),
     query<Room[]>(
       'rooms.byCrew',
-      supabase.rpc('list_crew_events', { p_crew_id: id }),
+      supabase.rpc('list_crew_events', { p_crew_id: id }).order('created_at', { ascending: false }).order('id'),
     ),
   ])
 

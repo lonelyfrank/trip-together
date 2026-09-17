@@ -3,6 +3,7 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
+import { compareRows } from '../../lib/collectionOrder'
 import { mutateNotify } from '../../lib/db'
 import { insertBoardLink, insertBoardNote, toggleBoardNotePin } from '../../lib/mutations'
 import type { BoardLink, BoardNote, Member, RoomChecklistItem } from '../../types'
@@ -34,12 +35,13 @@ export default function BachecaTab({
   const [linkUrl, setLinkUrl] = useState('')
   const optimistic = useRoomOptimistic(roomId)
 
-  const notes = [...boardNotes].sort((a, b) => Number(b.pinned) - Number(a.pinned))
+  const notes = [...boardNotes].sort((a, b) => Number(b.pinned) - Number(a.pinned) || compareRows(a, b, ['created_at', 'id']))
 
   async function addNote(e: FormEvent) {
     e.preventDefault()
     if (!noteText.trim()) return
-    await mutateNotify('board_notes.insert', insertBoardNote(roomId, noteText, notePinned), 'Nota non salvata.')
+    const { error } = await mutateNotify('board_notes.insert', insertBoardNote(roomId, noteText, notePinned), 'Nota non salvata.')
+    if (error) return
     setNoteText('')
     setNotePinned(false)
     setAddingNote(false)
@@ -60,7 +62,8 @@ export default function BachecaTab({
   async function addLink(e: FormEvent) {
     e.preventDefault()
     if (!linkLabel.trim() || !linkUrl.trim()) return
-    await mutateNotify('board_links.insert', insertBoardLink(roomId, linkLabel, linkUrl), 'Link non salvato.')
+    const { error } = await mutateNotify('board_links.insert', insertBoardLink(roomId, linkLabel, linkUrl), 'Link non salvato.')
+    if (error) return
     setLinkLabel('')
     setLinkUrl('')
     setAddingLink(false)

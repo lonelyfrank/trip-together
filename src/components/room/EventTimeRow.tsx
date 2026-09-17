@@ -2,6 +2,7 @@ import { Calendar, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import { mutate } from '../../lib/db'
+import { fromDatetimeLocal, toDatetimeLocal } from '../../lib/format'
 import { updateRoomEventTime } from '../../lib/mutations'
 import type { Room } from '../../types'
 
@@ -16,7 +17,7 @@ interface EventTimeRowProps {
  */
 export default function EventTimeRow({ room }: EventTimeRowProps) {
   const [editing, setEditing] = useState(false)
-  const [value, setValue] = useState(room.event_time?.slice(0, 16) ?? '')
+  const [value, setValue] = useState(toDatetimeLocal(room.event_time))
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -44,11 +45,11 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
 
   async function save(e: FormEvent) {
     e.preventDefault()
-    await persist(value ? new Date(value).toISOString() : null)
+    await persist(fromDatetimeLocal(value))
   }
 
   function startEditing() {
-    setValue(room.event_time?.slice(0, 16) ?? '')
+    setValue(toDatetimeLocal(room.event_time))
     setError(null)
     setEditing(true)
   }

@@ -39,6 +39,16 @@ try {
 
   for (const table of tables) await checked(owner.from(table).select('*').eq(table === 'rooms' ? 'id' : 'room_id', room.id))
   report('16 collezioni leggibili dal membro, nessun errore SQL/RLS')
+  for (const table of ['car_expenses', 'car_cargo', 'board_links']) await checked(owner.from(table).select('id,created_at').eq('room_id', room.id).order('created_at').order('id'))
+  const expenseId = crypto.randomUUID()
+  await checked(owner.from('general_expenses').insert({ id: expenseId, room_id: room.id, label: 'Verifica quote', amount: 10, paid_by_member_id: room.member_id }))
+  const participant = { expense_id: expenseId, member_id: room.member_id }
+  for (let attempt = 0; attempt < 2; attempt++) await checked(owner.from('general_expense_participants').upsert(participant, { onConflict: 'expense_id,member_id' }))
+  assert.equal((await checked(owner.from('general_expense_participants').select('id').eq('expense_id', expenseId))).length, 1)
+  assert.equal((await owner.from('general_expense_participants').insert(participant)).error?.code, '23505')
+  await checked(owner.from('general_expenses').delete().eq('id', expenseId))
+  report('fase 2: created_at disponibili; upsert ripetuto mantiene una quota, INSERT duplicato respinto')
+
   await checked(owner.from('radar_positions').insert({ room_id: room.id, member_id: room.member_id, lat: 0, lng: 0 }))
   for (const client of [visitor, unauthenticated]) {
     for (const table of ['rooms', 'radar_positions']) assert.deepEqual(await checked(client.from(table).select('*')), [])
@@ -63,9 +73,9 @@ try {
 
   await owner.realtime.setAuth((await owner.auth.getSession()).data.session.access_token)
   const received = [], deleteUnfiltered = []
-  let replicationReady = false
+  let replicationReady = false, subscriptionReady = false
   const channel = owner.channel(`verify:${room.id}`, { config: { broadcast: { replication_ready: true } } })
-    .on('system', {}, (event) => { console.log('REALTIME_SYSTEM', JSON.stringify(event)); if (event.status === 'ok') replicationReady = true })
+    .on('system', {}, (event) => { console.log('REALTIME_SYSTEM', JSON.stringify(event)); if (event.status === 'ok' && event.extension === 'system') replicationReady = true; if (event.status === 'ok' && event.extension === 'postgres_changes') subscriptionReady = true })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'board_notes', filter: `room_id=eq.${room.id}` }, (event) => received.push(event))
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'board_notes' }, (event) => deleteUnfiltered.push(event))
   await new Promise((resolve, reject) => {
@@ -75,7 +85,7 @@ try {
       if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') { clearTimeout(timer); reject(new Error(`Realtime: ${status}`)) }
     })
   })
-  await until(() => replicationReady, 'Replica PostgreSQL non pronta', 20000)
+  await until(() => replicationReady && subscriptionReady, 'Replica PostgreSQL non pronta', 20000)
   const noteId = crypto.randomUUID()
   await checked(owner.from('board_notes').insert({ id: noteId, room_id: room.id, text: 'Verifica inserimento' }))
   await until(() => received.some((e) => e.eventType === 'INSERT' && e.new.id === noteId), 'INSERT realtime mancante')
@@ -151,7 +161,7 @@ try {
 } finally {
   if (browser) await browser.close()
   if (room) {
-    for (const table of ['board_notes', 'radar_positions']) await checked(owner.from(table).delete().eq('room_id', room.id))
+    for (const table of ['board_notes', 'radar_positions', 'general_expenses']) await checked(owner.from(table).delete().eq('room_id', room.id))
     await checked(owner.from('rooms').update({ status: 'closed' }).eq('id', room.id))
     console.log('CLEANUP dati temporanei rimossi; evento di verifica archiviato nella comitiva isolata.')
   }

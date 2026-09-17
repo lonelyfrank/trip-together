@@ -23,14 +23,14 @@ async function fetchMyCrews(): Promise<MyCrewsPayload> {
 
   const crewIds = entries.map((e) => e.crewId)
   const [crewsQ, membersQ, roomsQ] = await Promise.all([
-    query<Crew[]>('crews.mine', supabase.from('crews').select('*').in('id', crewIds)),
+    query<Crew[]>('crews.mine', supabase.from('crews').select('*').in('id', crewIds).order('created_at', { ascending: false }).order('id')),
     query<{ id: string; crew_id: string }[]>(
       'crew_members.mine',
-      supabase.from('crew_members').select('id, crew_id').in('crew_id', crewIds),
+      supabase.from('crew_members').select('id, crew_id').in('crew_id', crewIds).order('created_at').order('id'),
     ),
     query<{ id: string; crew_id: string }[]>(
       'rooms.byCrews',
-      supabase.rpc('list_crew_events'),
+      supabase.rpc('list_crew_events').order('created_at', { ascending: false }).order('id'),
     ),
   ])
 
@@ -44,7 +44,6 @@ async function fetchMyCrews(): Promise<MyCrewsPayload> {
       memberCount: members.filter((m) => m.crew_id === crew.id).length,
       eventCount: events.filter((r) => r.crew_id === crew.id).length,
     }))
-    .sort((a, b) => (a.crew.created_at < b.crew.created_at ? 1 : -1))
 
   return { summaries, error: null }
 }

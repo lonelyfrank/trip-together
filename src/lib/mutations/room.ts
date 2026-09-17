@@ -209,7 +209,7 @@ export const insertGeneralExpenseParticipants = op(
   (expenseId: string, memberIds: string[]) =>
     supabase
       .from('general_expense_participants')
-      .insert(memberIds.map((memberId) => ({ expense_id: expenseId, member_id: memberId }))),
+      .upsert([...new Set(memberIds)].map((memberId) => ({ expense_id: expenseId, member_id: memberId })), { onConflict: 'expense_id,member_id' }),
 )
 
 export const waiveGeneralExpense = op('general_expenses.waive', (expenseId: string, waivedByMemberId: string) =>

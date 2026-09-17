@@ -81,6 +81,7 @@ export interface CarExpense {
   label: string
   amount: number
   paid_by_member_id: string | null
+  created_at: string
 }
 
 export interface CarCargoItem {
@@ -88,6 +89,7 @@ export interface CarCargoItem {
   car_id: string
   item: string
   packed: boolean
+  created_at: string
 }
 
 export interface GeneralExpense {
@@ -120,6 +122,7 @@ export interface BoardLink {
   room_id: string
   label: string
   url: string
+  created_at: string
 }
 
 export interface RadarPosition {

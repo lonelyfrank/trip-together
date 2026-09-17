@@ -33,11 +33,12 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
     if (!reason) return
     setSaving(true)
     try {
-      await mutateNotify(
+      const { error } = await mutateNotify(
         'delay_reports.insert',
         insertDelayReport(carId, reason, minutes, currentMemberId),
         'Ritardo non segnalato.',
       )
+      if (error) return
       setReason(null)
       setMinutes(null)
       setOpen(false)

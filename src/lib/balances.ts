@@ -34,10 +34,10 @@ export function computeBalances({
   for (const expense of carExpenses) {
     const car = cars.find((c) => c.id === expense.car_id)
     if (!car) continue
-    const participantIds = [
+    const participantIds = [...new Set([
       car.driver_member_id,
       ...carPassengers.filter((cp) => cp.car_id === car.id).map((cp) => cp.member_id),
-    ]
+    ])]
     if (participantIds.length === 0) continue
     const share = expense.amount / participantIds.length
     for (const id of participantIds) add(id, -share)
@@ -46,9 +46,9 @@ export function computeBalances({
 
   for (const expense of generalExpenses) {
     if (expense.waived) continue
-    const participantIds = generalExpenseParticipants
+    const participantIds = [...new Set(generalExpenseParticipants
       .filter((p) => p.expense_id === expense.id)
-      .map((p) => p.member_id)
+      .map((p) => p.member_id))]
     if (participantIds.length === 0) continue
     const share = expense.amount / participantIds.length
     for (const id of participantIds) add(id, -share)

@@ -708,3 +708,27 @@ grant execute on function public.is_room_member(uuid), public.is_crew_member(uui
 
 notify pgrst, 'reload schema';
 commit;
+
+-- ═══ Fix: ordine cronologico e quote spesa univoche ═══
+begin;
+
+alter table public.car_expenses
+  add column if not exists created_at timestamptz not null default now();
+alter table public.car_cargo
+  add column if not exists created_at timestamptz not null default now();
+alter table public.board_links
+  add column if not exists created_at timestamptz not null default now();
+
+-- Evita nuovi duplicati fra la pulizia e la creazione del vincolo.
+lock table public.general_expense_participants in share row exclusive mode;
+delete from public.general_expense_participants as duplicato
+using public.general_expense_participants as originale
+where duplicato.expense_id = originale.expense_id
+  and duplicato.member_id = originale.member_id
+  and duplicato.ctid > originale.ctid;
+
+create unique index if not exists idx_general_expense_participants_unique
+  on public.general_expense_participants (expense_id, member_id);
+
+notify pgrst, 'reload schema';
+commit;

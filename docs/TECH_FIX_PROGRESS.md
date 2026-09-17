@@ -102,6 +102,41 @@ reale. Il vincolo dell'utente impedisce di eseguire tale prova autonomamente.
 Le scelte dei punti 4d (atomicità), 4e (sessione non-null), 3d (lettura locale
 memoizzata) sono già realizzate in questa fase perché necessarie al nuovo accesso.
 
+## Fase 2 — completata dopo conferma SQL
+
+Fase 1: commit `35cdc71` (`limita l'accesso ai membri e collega le rpc`).
+L'utente ha confermato anche il blocco `Fix: ordine cronologico e quote spesa
+univoche`; non è stato eseguito DDL dall'agente.
+
+- Conversione simmetrica datetime-local/UTC: verificati inverno, estate,
+  cambio del giorno e campo vuoto; doppio salvataggio senza slittamenti nel browser.
+- `created_at` aggiunto ai tipi delle tre collezioni aggiornate. Tutte le query
+  lista hanno ordine esplicito; cache realtime ordinata con gli stessi criteri,
+  conservando anche la precisione in microsecondi di PostgreSQL e lo spareggio ID.
+- Note fissate prima delle altre, poi created_at/ID. Tabelle ponte per chiave;
+  radar per member_id. Una UPDATE non cambia la posizione cronologica.
+- Quote via upsert su expense_id/member_id; deduplica difensiva anche degli ID
+  nella richiesta e degli ID nel calcolo dei saldi auto/generali.
+- Note, link, proposte di sosta e ritardi mantengono i valori quando il server
+  restituisce un errore. Verificati tutti e quattro i form nel browser.
+- `npm run check && npm test && npm run build`: superato (10 file di test).
+- Smoke UI: superato, inclusa risposta persa **dopo** il commit delle quote e
+  retry senza duplicazione.
+- Prova reale: nuove colonne disponibili; upsert ripetuto lascia una sola quota;
+  INSERT duplicato respinto con 23505. Anche invito, recupero e INSERT/UPDATE/DELETE
+  realtime sono passati nuovamente, compresa la bacheca nel browser.
+
+Nella prima ripetizione del test remoto è mancato INSERT: il test prendeva per
+buona la prima notifica `system` (replica pronta), prima della conferma specifica
+`postgres_changes`. Ora attende entrambe. La successiva esecuzione è passata;
+la rilettura e il polling restano necessari perché realtime non garantisce la
+consegna di ogni evento. I due ulteriori eventi di prova sono stati archiviati,
+con note, posizioni e spese di test eliminate; restano le rispettive comitive e
+appartenenze isolate. Nessun dato utente modificato.
+
+La rieseguibilità del blocco SQL è stata revisionata staticamente, senza una
+seconda applicazione DDL. Il lock impedisce scritture fra deduplica e indice.
+
 ## Fasi successive
 
-Fasi 2–5: da implementare, con gli ulteriori punti di conferma SQL previsti dal piano.
+Fasi 3–5: da implementare, con gli ulteriori punti di conferma SQL previsti dal piano.

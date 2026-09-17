@@ -47,11 +47,12 @@ export default function StopProposalsSection({
     if (!type) return
     setSaving(true)
     try {
-      await mutateNotify(
+      const { error } = await mutateNotify(
         'stop_proposals.insert',
         insertStopProposal(roomId, carId, currentMember.id, type, note.trim() || null),
         'Proposta non inviata.',
       )
+      if (error) return
       setType(null)
       setNote('')
       setOpen(false)

@@ -1,6 +1,7 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
+import { COLLECTION_ORDER, orderCollection } from '../lib/collectionOrder'
 import { firstError, query, rows, single } from '../lib/db'
 import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type {
@@ -89,6 +90,12 @@ const TABLES: { table: string; key: CollectionKey; pk: string[] }[] = [
 ]
 const BY_TABLE = new Map(TABLES.map((t) => [t.table, t]))
 
+function roomList(table: string, roomId: string) {
+  let request = supabase.from(table).select('*').eq('room_id', roomId)
+  for (const column of COLLECTION_ORDER[table]) request = request.order(column, { ascending: true, nullsFirst: false })
+  return request
+}
+
 async function fetchRoomData(id: string): Promise<RoomPayload> {
   await ensureAnonymousSession()
   const [
@@ -110,30 +117,30 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     rideRequestsQ,
   ] = await Promise.all([
     query<Room>('rooms.byId', supabase.from('rooms').select('*').eq('id', id).maybeSingle()),
-    query<Member[]>('members.byRoom', supabase.from('members').select('*').eq('room_id', id)),
-    query<Car[]>('cars.byRoom', supabase.from('cars').select('*').eq('room_id', id)),
-    query<CarPassenger[]>('car_passengers.byRoom', supabase.from('car_passengers').select('*').eq('room_id', id)),
-    query<CarExpense[]>('car_expenses.byRoom', supabase.from('car_expenses').select('*').eq('room_id', id)),
-    query<CarCargoItem[]>('car_cargo.byRoom', supabase.from('car_cargo').select('*').eq('room_id', id)),
-    query<DelayReport[]>('delay_reports.byRoom', supabase.from('delay_reports').select('*').eq('room_id', id)),
-    query<GeneralExpense[]>('general_expenses.byRoom', supabase.from('general_expenses').select('*').eq('room_id', id)),
+    query<Member[]>('members.byRoom', roomList('members', id)),
+    query<Car[]>('cars.byRoom', roomList('cars', id)),
+    query<CarPassenger[]>('car_passengers.byRoom', roomList('car_passengers', id)),
+    query<CarExpense[]>('car_expenses.byRoom', roomList('car_expenses', id)),
+    query<CarCargoItem[]>('car_cargo.byRoom', roomList('car_cargo', id)),
+    query<DelayReport[]>('delay_reports.byRoom', roomList('delay_reports', id)),
+    query<GeneralExpense[]>('general_expenses.byRoom', roomList('general_expenses', id)),
     query<GeneralExpenseParticipant[]>(
       'general_expense_participants.byRoom',
-      supabase.from('general_expense_participants').select('*').eq('room_id', id),
+      roomList('general_expense_participants', id),
     ),
-    query<BoardNote[]>('board_notes.byRoom', supabase.from('board_notes').select('*').eq('room_id', id)),
-    query<BoardLink[]>('board_links.byRoom', supabase.from('board_links').select('*').eq('room_id', id)),
-    query<RadarPosition[]>('radar_positions.byRoom', supabase.from('radar_positions').select('*').eq('room_id', id)),
+    query<BoardNote[]>('board_notes.byRoom', roomList('board_notes', id)),
+    query<BoardLink[]>('board_links.byRoom', roomList('board_links', id)),
+    query<RadarPosition[]>('radar_positions.byRoom', roomList('radar_positions', id)),
     query<RoomChecklistItem[]>(
       'room_checklist_items.byRoom',
-      supabase.from('room_checklist_items').select('*').eq('room_id', id),
+      roomList('room_checklist_items', id),
     ),
-    query<StopProposal[]>('stop_proposals.byRoom', supabase.from('stop_proposals').select('*').eq('room_id', id)),
+    query<StopProposal[]>('stop_proposals.byRoom', roomList('stop_proposals', id)),
     query<StopProposalVote[]>(
       'stop_proposal_votes.byRoom',
-      supabase.from('stop_proposal_votes').select('*').eq('room_id', id),
+      roomList('stop_proposal_votes', id),
     ),
-    query<RideRequest[]>('ride_requests.byRoom', supabase.from('ride_requests').select('*').eq('room_id', id)),
+    query<RideRequest[]>('ride_requests.byRoom', roomList('ride_requests', id)),
   ])
 
   return {
@@ -189,10 +196,10 @@ function applyChange(
 
   if (eventType === 'INSERT') {
     if (list.some((x) => idOf(x) === idOf(newRow))) return prev
-    return { ...prev, [cfg.key]: [...list, newRow] }
+    return { ...prev, [cfg.key]: orderCollection(table, [...list, newRow]) }
   }
   if (eventType === 'UPDATE') {
-    return { ...prev, [cfg.key]: list.map((x) => (idOf(x) === idOf(newRow) ? newRow : x)) }
+    return { ...prev, [cfg.key]: orderCollection(table, list.map((x) => (idOf(x) === idOf(newRow) ? newRow : x))) }
   }
   return { ...prev, [cfg.key]: list.filter((x) => idOf(x) !== idOf(oldRow)) }
 }

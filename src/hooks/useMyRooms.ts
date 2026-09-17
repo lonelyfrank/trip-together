@@ -29,24 +29,24 @@ async function fetchMyRooms(): Promise<MyRoomsPayload> {
   const cutoff = new Date(Date.now() - RADAR_ACTIVE_WINDOW_MS).toISOString()
 
   const [roomsQ, membersQ, carExpensesQ, generalExpensesQ, radarQ] = await Promise.all([
-    query<Room[]>('rooms.mine', supabase.from('rooms').select('*').in('id', roomIds)),
+    query<Room[]>('rooms.mine', supabase.from('rooms').select('*').in('id', roomIds).order('created_at', { ascending: false }).order('id')),
     query<{ id: string; room_id: string }[]>(
       'members.mine',
-      supabase.from('members').select('id, room_id').in('room_id', roomIds),
+      supabase.from('members').select('id, room_id').in('room_id', roomIds).order('created_at').order('id'),
     ),
     // any: l'embed cars!inner è tipizzato come array da supabase-js, ma a runtime
     // (to-one) è un oggetto; si legge e.cars.room_id come nell'implementazione originale.
     query<any[]>(
       'car_expenses.mine',
-      supabase.from('car_expenses').select('car_id, cars!inner(room_id)').in('cars.room_id', roomIds),
+      supabase.from('car_expenses').select('car_id, cars!inner(room_id)').in('cars.room_id', roomIds).order('created_at').order('id'),
     ),
     query<{ room_id: string; waived: boolean }[]>(
       'general_expenses.mine',
-      supabase.from('general_expenses').select('room_id, waived').in('room_id', roomIds),
+      supabase.from('general_expenses').select('room_id, waived').in('room_id', roomIds).order('created_at').order('id'),
     ),
     query<{ room_id: string; updated_at: string }[]>(
       'radar_positions.mine',
-      supabase.from('radar_positions').select('room_id, updated_at').in('room_id', roomIds).gt('updated_at', cutoff),
+      supabase.from('radar_positions').select('room_id, updated_at').in('room_id', roomIds).order('member_id').gt('updated_at', cutoff),
     ),
   ])
 
@@ -71,7 +71,6 @@ async function fetchMyRooms(): Promise<MyRoomsPayload> {
         radarActive: radar.some((r) => r.room_id === room.id),
       }
     })
-    .sort((a, b) => (a.room.created_at < b.room.created_at ? 1 : -1))
 
   return { summaries, error: null }
 }

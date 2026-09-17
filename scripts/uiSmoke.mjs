@@ -7,7 +7,7 @@ const roomId='11111111-1111-4111-8111-111111111111';
 const memberId='22222222-2222-4222-8222-222222222222';
 const errors=[];
 async function context(fixture=false) {
-  const ctx=await browser.newContext({ignoreHTTPSErrors:true, viewport:{width:390,height:844}});
+  const ctx=await browser.newContext({ignoreHTTPSErrors:true, timezoneId:'Europe/Rome', viewport:{width:390,height:844}});
   const state={failTable:null, failParticipants:false, requests:[], tables:{
     rooms:[{id:roomId,title:'Domenica al lago',invite_code:'LAGO42',crew_id:null,destination_label:'Lago di Garda',destination_lat:null,destination_lng:null,event_time:new Date(Date.now()+86400000).toISOString(),status:'open',created_by:'user',created_at:new Date().toISOString()}],
     members:[{id:memberId,room_id:roomId,display_name:'Franco',auth_user_id:'user',role:'creator',confirmed:false,confirmed_at:null},{id:'member-luca',room_id:roomId,display_name:'Luca',role:'guest',confirmed:true}],
@@ -16,8 +16,8 @@ async function context(fixture=false) {
   if(fixture) await ctx.addInitScript(({roomId,memberId})=>{localStorage.setItem('tripTogether:rooms',JSON.stringify([{roomId,memberId,inviteCode:'LAGO42'}]));localStorage.setItem('tripTogether:myName','Franco')},{roomId,memberId});
   await ctx.route('**/*.supabase.co/**',route=>{
     const req=route.request(), url=new URL(req.url()), table=url.pathname.split('/').pop(), method=req.method();
-    state.requests.push({table,method});
-    if(table===state.failTable || table==='general_expense_participants' && method==='POST' && state.failParticipants) return route.fulfill({status:500,json:{message:'Simulated error',code:'TEST'}});
+    state.requests.push({table,method,order:url.searchParams.get('order'),onConflict:url.searchParams.get('on_conflict')});
+    if(table===state.failTable) return route.fulfill({status:500,json:{message:'Simulated error',code:'TEST'}});
     if(url.pathname.includes('/auth/')) return route.fulfill({json:{access_token:'mock-token',refresh_token:'mock-refresh',expires_in:3600,token_type:'bearer',user:{id:'user',aud:'authenticated',role:'authenticated'}}});
     if(!fixture) return route.fulfill({json:[]});
     if(method==='PATCH') {
@@ -25,7 +25,18 @@ async function context(fixture=false) {
       state.tables[table]=(state.tables[table]??[]).map(item=>({...item,...values}));
       return route.fulfill({json:req.headers().accept?.includes('object') ? state.tables[table][0] : state.tables[table]});
     }
-    if(method==='POST') {const value=req.postDataJSON(); const rows=Array.isArray(value)?value:[value]; state.tables[table]=[...(state.tables[table]??[]),...rows];return route.fulfill({status:201,json:rows});}
+    if(method==='POST') {
+      const value=req.postDataJSON(), rows=(Array.isArray(value)?value:[value]).map(row=>({id:crypto.randomUUID(),created_at:new Date().toISOString(),...row}));
+      const existing=state.tables[table]??[], conflict=url.searchParams.get('on_conflict')?.split(',');
+      for(const row of rows) {
+        const index=conflict ? existing.findIndex(old=>conflict.every(key=>old[key]===row[key])) : -1;
+        if(index<0) existing.push(row); else existing[index]={...existing[index],...row,id:existing[index].id};
+      }
+      state.tables[table]=existing;
+      // Il DB ha scritto, ma la risposta non arriva: il retry deve essere idempotente.
+      if(table==='general_expense_participants' && state.failParticipants) return route.fulfill({status:500,json:{message:'Risposta persa dopo il commit',code:'TEST'}});
+      return route.fulfill({status:201,json:rows});
+    }
     if(method==='DELETE') {state.tables[table]=[];return route.fulfill({status:204});}
     const rows=state.tables[table]??[];
     return route.fulfill({json:req.headers().accept?.includes('object') ? rows[0]??null : rows});
@@ -69,6 +80,7 @@ try {
     await page.getByRole('button',{name:'Aggiungi spesa',exact:true}).click();
     await page.getByText('La spesa è stata creata, ma mancano le quote.',{exact:false}).waitFor();
     assert.equal(state.tables.general_expenses.length,1);
+    assert.equal(state.tables.general_expense_participants.length,2);
     state.failParticipants=false;
     await page.getByRole('button',{name:'Riprova a salvare le quote',exact:true}).click();
     await page.getByRole('dialog').waitFor({state:'detached'});assert.equal(state.tables.general_expenses.length,1);assert.equal(state.tables.general_expense_participants.length,2);
@@ -91,6 +103,58 @@ try {
     assert.deepEqual(state.requests.filter(req=>req.method==='DELETE').map(req=>req.table).filter(table=>table!=='radar_positions'),[]);
     await page.getByRole('button',{name:/Domenica al lago/}).click();await page.getByRole('heading',{name:'Il ricordo del vostro evento'}).waitFor();assert.equal(await page.getByRole('navigation',{name:'Sezioni dell’evento'}).count(),0);
     console.log('PASS callback GPS tardiva ignorata, archiviazione senza cancellazioni dello storico, riepilogo archivio in sola lettura');await ctx.close();
+  }
+  {
+    const {ctx,page,state}=await context(true);
+    await page.goto(`${base}/room/${roomId}`);
+    await page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    for(const [local,iso] of [['2027-01-15T10:30','2027-01-15T09:30:00.000Z'],['2027-07-15T10:30','2027-07-15T08:30:00.000Z']]) {
+      await page.getByRole('button',{name:/\d{2}:\d{2} modifica/}).click();
+      await page.locator('input[type="datetime-local"]').fill(local);
+      await page.getByRole('button',{name:'Salva data',exact:true}).click();
+      await page.locator('input[type="datetime-local"]').waitFor({state:'detached'});
+      assert.equal(state.tables.rooms[0].event_time,iso);
+      await page.reload(); await page.getByRole('button',{name:/\d{2}:\d{2} modifica/}).click();
+      assert.equal(await page.locator('input[type="datetime-local"]').inputValue(),local);
+      await page.getByRole('button',{name:'Salva data',exact:true}).click();
+      await page.locator('input[type="datetime-local"]').waitFor({state:'detached'});
+      assert.equal(state.tables.rooms[0].event_time,iso);
+    }
+    await page.getByRole('button',{name:'Bacheca',exact:true}).click();
+    await page.getByRole('button',{name:'Aggiungi nota',exact:true}).click();
+    await page.getByPlaceholder('Scrivi una nota...').fill('Non perdere questa nota');
+    state.failTable='board_notes';
+    await page.getByRole('button',{name:'Aggiungi',exact:true}).click();
+    await page.getByText('Nota non salvata.',{exact:true}).waitFor();
+    assert.equal(await page.getByPlaceholder('Scrivi una nota...').inputValue(),'Non perdere questa nota');
+    await page.getByRole('button',{name:'Annulla',exact:true}).click();
+    await page.getByRole('button',{name:'Aggiungi link',exact:true}).click();
+    await page.getByPlaceholder('Etichetta (es. Biglietti concerto)').fill('Biglietti');
+    await page.getByPlaceholder('URL',{exact:true}).fill('https://example.com');
+    state.failTable='board_links';
+    await page.getByRole('button',{name:'Aggiungi',exact:true}).click();
+    await page.getByText('Link non salvato.',{exact:true}).waitFor();
+    assert.equal(await page.getByPlaceholder('URL',{exact:true}).inputValue(),'https://example.com');
+    state.failTable=null;
+    state.tables.cars=[{id:'car-test',room_id:roomId,driver_member_id:memberId,seats_total:4,travel_status:'in_viaggio',created_at:new Date().toISOString()}];
+    await page.goto(`${base}/room/${roomId}?tab=auto`);
+    await page.getByRole('button',{name:'Proponi sosta',exact:true}).first().click();
+    await page.getByRole('button',{name:'Benzina',exact:true}).click();
+    await page.getByPlaceholder('Nota breve (opzionale)').fill('Sosta da conservare');
+    state.failTable='stop_proposals';
+    await page.getByRole('button',{name:'Proponi (scade tra 15 min)',exact:true}).click();
+    await page.getByText('Proposta non inviata.',{exact:true}).waitFor();
+    assert.equal(await page.getByPlaceholder('Nota breve (opzionale)').inputValue(),'Sosta da conservare');
+    await page.keyboard.press('Escape'); state.failTable='delay_reports';
+    await page.getByRole('button',{name:'Segnala ritardo',exact:true}).click();
+    await page.getByRole('button',{name:'Traffico',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'+',exact:true}).click();
+    await page.getByRole('button',{name:'Segnala',exact:true}).click();
+    await page.getByText('Ritardo non segnalato.',{exact:true}).waitFor();
+    assert.equal(await page.getByRole('dialog').getByText('~5 min',{exact:true}).count(),1);
+    assert.equal(await page.getByRole('button',{name:'Segnala',exact:true}).isEnabled(),true);
+    console.log('PASS data inverno/estate senza slittamento al secondo salvataggio; note, link, soste e ritardi conservati su errore');
+    await ctx.close();
   }
   assert.deepEqual(errors,[]);console.log('PASS nessun errore JavaScript');
 } finally {await browser.close()}
