@@ -17,10 +17,14 @@ export default function Toaster() {
         return (
           <div
             key={t.id}
-            className="pointer-events-auto flex w-full items-center gap-2.5 rounded-xl border border-border-strong bg-surface px-3.5 py-2.5 shadow-lg"
+            role={t.kind === 'error' ? 'alert' : 'status'}
+            className={`pointer-events-auto flex w-full items-center gap-2.5 rounded-xl border border-border-strong bg-surface px-3.5 py-2.5 shadow-lg transition-all duration-200 ${
+              t.leaving ? 'scale-95 opacity-0' : 'opacity-100'
+            }`}
+            style={t.leaving ? undefined : { animation: 'fade-slide-up 0.22s ease-out' }}
           >
             <Icon size={15} className={`shrink-0 ${ACCENT[t.kind]}`} />
-            <p className="flex-1 text-[12.5px] text-cream">{t.message}</p>
+            <p className="flex-1 text-[13px] text-cream">{t.message}</p>
             {t.action && (
               <button
                 onClick={() => {
@@ -32,7 +36,7 @@ export default function Toaster() {
                 {t.action.label}
               </button>
             )}
-            <button onClick={() => dismissToast(t.id)} className="shrink-0 text-muted">
+            <button type="button" aria-label="Chiudi notifica" onClick={() => dismissToast(t.id)} className="flex h-11 w-11 shrink-0 items-center justify-center text-muted">
               <X size={13} />
             </button>
           </div>

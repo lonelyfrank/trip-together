@@ -1,5 +1,5 @@
 import { Compass, Radio } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Button from '../ui/Button'
 import { mutate } from '../../lib/db'
 import { bearingDegrees, distanceMeters, formatDistance, radarIntervalMs } from '../../lib/geo'
@@ -28,56 +28,62 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
   const [active, setActive] = useState(false)
   const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-
-  const destination =
-    room.destination_lat !== null && room.destination_lng !== null
-      ? { lat: room.destination_lat, lng: room.destination_lng }
-      : null
 
   useEffect(() => {
-    return () => {
-      if (timerRef.current) clearTimeout(timerRef.current)
-    }
-  }, [])
+    if (!active) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const destination = room.destination_lat !== null && room.destination_lng !== null
+      ? { lat: room.destination_lat, lng: room.destination_lng } : null
 
-  function ping() {
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const lat = pos.coords.latitude
-        const lng = pos.coords.longitude
-        setMyPos({ lat, lng })
-        setError(null)
-        await mutate(
-          'radar_positions.upsert',
-          upsertRadarPosition(currentMember.id, room.id, lat, lng, new Date().toISOString()),
-        )
-        const distToDestination = destination ? distanceMeters({ lat, lng }, destination) : null
-        timerRef.current = setTimeout(ping, radarIntervalMs(distToDestination))
-      },
-      (err) => {
-        setError(err.message)
-        setActive(false)
-      },
-      { enableHighAccuracy: true, timeout: 15_000 },
-    )
-  }
-
-  async function toggle() {
-    if (active) {
-      if (timerRef.current) clearTimeout(timerRef.current)
+    function fail(message: string) {
+      if (cancelled) return
+      setError(message)
       setActive(false)
       setMyPos(null)
-      await mutate('radar_positions.delete', deleteRadarPosition(currentMember.id))
-      return
     }
-    if (!('geolocation' in navigator)) {
+
+    function ping() {
+      if (cancelled) return
+      navigator.geolocation.getCurrentPosition(async (position) => {
+        if (cancelled) return
+        const point = { lat: position.coords.latitude, lng: position.coords.longitude }
+        try {
+          await radarWrite(currentMember.id, async () => {
+            if (cancelled) return
+            const { error: writeError } = await mutate('radar_positions.upsert', upsertRadarPosition(currentMember.id, room.id, point.lat, point.lng, new Date().toISOString()))
+            if (writeError) throw writeError
+          })
+          if (cancelled) return
+          setMyPos(point)
+          setError(null)
+          timer = setTimeout(ping, radarIntervalMs(destination ? distanceMeters(point, destination) : null))
+        } catch { fail('Non riusciamo a condividere la posizione. Controlla la connessione e riattiva il radar.') }
+      }, (failure) => {
+        fail(failure.code === 1 ? 'Consenti l’accesso alla posizione nelle impostazioni del browser per usare il radar.' : 'Posizione non disponibile. Spostati in un luogo aperto e riprova.')
+      }, { enableHighAccuracy: true, timeout: 15_000 })
+    }
+
+    ping()
+    return () => {
+      cancelled = true
+      if (timer) clearTimeout(timer)
+      // La rimozione segue anche un'eventuale scrittura ancora in corso.
+      void radarWrite(currentMember.id, async () => {
+        const { error: deleteError } = await mutate('radar_positions.delete', deleteRadarPosition(currentMember.id))
+        if (deleteError) console.error('[radar] Impossibile rimuovere la posizione', deleteError.message)
+      }).catch(() => console.error('[radar] Pulizia della posizione non riuscita'))
+    }
+  }, [active, currentMember.id, room.id, room.destination_lat, room.destination_lng])
+
+  function toggle() {
+    if (!active && !('geolocation' in navigator)) {
       setError('Il tuo browser non supporta la geolocalizzazione.')
       return
     }
     setError(null)
-    setActive(true)
-    ping()
+    setMyPos(null)
+    setActive((previous) => !previous)
   }
 
   const others = radarPositions.filter(
@@ -91,16 +97,15 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           {active ? 'Radar attivo' : 'Radar in pausa'}
         </p>
-        <Button variant={active ? 'teal' : 'surface'} size="sm" onClick={toggle}>
-          <Radio size={11} /> {active ? 'Attivo' : 'Attiva'}
+        <Button aria-pressed={active} variant={active ? 'teal' : 'surface'} size="sm" onClick={toggle}>
+          <Radio size={11} /> {active ? 'Disattiva' : 'Attiva radar'}
         </Button>
       </div>
 
       {error && <p className="mb-3 w-full text-sm text-coral">{error}</p>}
 
       <p className="mb-4 w-full text-center text-[11px] leading-relaxed text-muted">
-        Posizione condivisa solo mentre il radar è attivo, mai salvata come storico — ti porta a
-        circa 10 metri dagli altri, non con precisione chirurgica.
+        Il radar si ferma quando esci da questa sezione. La posizione non viene conservata come storico; la precisione dipende dal segnale GPS. Se perdi la connessione, l’ultima posizione può restare visibile per alcuni minuti.
       </p>
 
       <div className="relative flex h-64 w-64 items-center justify-center">
@@ -145,7 +150,7 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
                 style={{ transform: `translate(${x}px, ${y}px)` }}
               >
                 <div className="h-3 w-3 rounded-full bg-amber shadow-[0_0_10px_var(--color-amber)]" />
-                <span className="whitespace-nowrap rounded-full bg-ink-deep/85 px-1.5 py-0.5 font-mono text-[9px] text-cream">
+                <span className="whitespace-nowrap rounded-full bg-ink-deep/85 px-1.5 py-0.5 font-mono text-[10px] text-cream">
                   {memberById(p.member_id)?.display_name ?? '?'} · {formatDistance(dist)}
                 </span>
               </div>
@@ -172,4 +177,15 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
       </div>
     </div>
   )
+}
+
+// Serializza anche tra smontaggio e riapertura della tab: una pulizia tardiva
+// non deve cancellare la posizione della nuova sessione.
+const radarWrites = new Map<string, Promise<void>>()
+function radarWrite(memberId: string, work: () => Promise<void>): Promise<void> {
+  const next = (radarWrites.get(memberId) ?? Promise.resolve()).catch(() => {}).then(work)
+  radarWrites.set(memberId, next)
+  const clear = () => { if (radarWrites.get(memberId) === next) radarWrites.delete(memberId) }
+  void next.then(clear, clear)
+  return next
 }

@@ -77,7 +77,7 @@ export default function ChecklistSection({ roomId, currentMember, members, items
                   <Circle size={15} className={canToggle ? 'text-border-dashed' : 'text-border-soft'} />
                 )}
               </button>
-              <span className={`flex-1 text-[12.5px] ${item.status === 'portato' ? 'text-muted line-through' : 'text-cream'}`}>
+              <span className={`flex-1 text-[13px] ${item.status === 'portato' ? 'text-muted line-through' : 'text-cream'}`}>
                 {item.title}
               </span>
               {assignee ? (

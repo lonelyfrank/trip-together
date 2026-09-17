@@ -3,8 +3,9 @@ import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
+import { formatMoney } from '../../lib/format'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
-import { mutate, mutateNotify } from '../../lib/db'
+import { mutateNotify } from '../../lib/db'
 import {
   deleteCar,
   deleteCarPassengerByMember,
@@ -63,6 +64,8 @@ export default function AutoTab({
 
   const memberById = (id: string) => members.find((m) => m.id === id)
   const currentCarId = carPassengers.find((cp) => cp.member_id === currentMember.id)?.car_id
+  const myCarId = cars.find((car) => car.driver_member_id === currentMember.id)?.id ?? currentCarId
+  const orderedCars = [...cars].sort((a, b) => Number(b.id === myCarId) - Number(a.id === myCarId))
   const iAmDriver = cars.some((c) => c.driver_member_id === currentMember.id)
 
   const assignedIds = new Set([...cars.map((c) => c.driver_member_id), ...carPassengers.map((cp) => cp.member_id)])
@@ -74,11 +77,12 @@ export default function AutoTab({
     if (!total || total < 1) return
     setSavingCar(true)
     try {
-      await mutateNotify(
+      const { error } = await mutateNotify(
         'cars.insert',
         insertCar(roomId, currentMember.id, total),
         'Auto non creata.',
       )
+      if (error) return
       setSeats('4')
       setAddingCar(false)
     } finally {
@@ -87,6 +91,7 @@ export default function AutoTab({
   }
 
   function removeCar(carId: string) {
+    if (!window.confirm('Eliminare questa auto? Passeggeri, spese e carico associati andranno persi.')) return
     optimistic(
       'cars.delete',
       (prev) => ({
@@ -100,8 +105,6 @@ export default function AutoTab({
   }
 
   async function takeSeat(carId: string) {
-    if (currentCarId)
-      await mutate('car_passengers.leave', deleteCarPassengerByMember(currentMember.id))
     await mutateNotify('car_passengers.take', insertCarPassenger(carId, currentMember.id), 'Posto non assegnato.')
   }
 
@@ -115,7 +118,6 @@ export default function AutoTab({
   }
 
   async function assignMember(carId: string, memberId: string) {
-    await mutate('car_passengers.reassignClear', deleteCarPassengerByMember(memberId))
     await mutateNotify('car_passengers.assign', insertCarPassenger(carId, memberId), 'Assegnazione non riuscita.')
   }
 
@@ -166,7 +168,7 @@ export default function AutoTab({
         </>
       )}
 
-      {cars.map((car) => {
+      {orderedCars.map((car) => {
         const passengers = carPassengers.filter((cp) => cp.car_id === car.id)
         const freeSeats = car.seats_total - 1 - passengers.length
         const driver = memberById(car.driver_member_id)
@@ -175,8 +177,17 @@ export default function AutoTab({
         const iAmThisDriver = car.driver_member_id === currentMember.id
         const iAmInThisCar = currentCarId === car.id
 
+        const activeDelay = delayReports.find((d) => d.car_id === car.id && !d.resolved_at)
+        const carProposals = stopProposals.filter((p) => p.car_id === car.id)
+        // Ritardo e proposte-sosta hanno senso solo mentre l'auto è in viaggio (o se
+        // c'è già un ritardo aperto da prima): stessa condizione, un solo posto dove
+        // deciderla, invece di ripeterla su ogni sotto-blocco.
+        const canReportOrPropose = (iAmThisDriver || iAmInThisCar) && car.travel_status === 'in_viaggio'
+        const showTravelZone = !!activeDelay || canReportOrPropose || carProposals.length > 0
+
         return (
-          <Card key={car.id}>
+          <Card key={car.id} tone={car.id === myCarId ? 'highlight' : 'surface'}>
+            {car.id === myCarId && <p className="mb-3 text-xs font-medium uppercase tracking-widest text-teal">La tua auto</p>}
             <div className="mb-2.5 flex items-start justify-between">
               <div>
                 <p className="font-serif text-[16px] leading-none text-cream">Auto di {driver?.display_name ?? '—'}</p>
@@ -195,9 +206,12 @@ export default function AutoTab({
             </div>
 
             <div className="mb-3 flex flex-wrap gap-1.5">
-              {[car.driver_member_id, ...passengers.map((p) => p.member_id)].map((id) => (
-                <span key={id} className="rounded-full bg-ink px-2.5 py-1 text-[11px] text-cream">
-                  {memberById(id)?.display_name ?? '?'}
+              <span className="rounded-full bg-amber/15 px-2.5 py-1 text-[11px] font-medium text-amber">
+                {driver?.display_name ?? '?'}
+              </span>
+              {passengers.map((p) => (
+                <span key={p.member_id} className="rounded-full bg-ink px-2.5 py-1 text-[11px] text-cream">
+                  {memberById(p.member_id)?.display_name ?? '?'}
                 </span>
               ))}
               {Array.from({ length: Math.max(freeSeats, 0) }).map((_, i) => (
@@ -207,39 +221,38 @@ export default function AutoTab({
               ))}
             </div>
 
-            <div className="mb-3">
-              <DelayReportBadge
-                carId={car.id}
-                currentMemberId={currentMember.id}
-                canReport={(iAmThisDriver || iAmInThisCar) && car.travel_status === 'in_viaggio'}
-                activeDelay={delayReports.find((d) => d.car_id === car.id && !d.resolved_at)}
-              />
-            </div>
-
-            <div className="mb-3">
-              <StopProposalsSection
-                roomId={roomId}
-                carId={car.id}
-                currentMember={currentMember}
-                eligibleMembers={[car.driver_member_id, ...passengers.map((p) => p.member_id)]
-                  .map((id) => memberById(id))
-                  .filter((m): m is Member => !!m)}
-                proposals={stopProposals.filter((p) => p.car_id === car.id)}
-                votes={stopProposalVotes}
-                canPropose={(iAmThisDriver || iAmInThisCar) && car.travel_status === 'in_viaggio'}
-                title="Proposte per quest'auto"
-              />
-            </div>
-
-            {!iAmThisDriver && !iAmInThisCar && freeSeats > 0 && (
-              <Button size="sm" variant="teal" onClick={() => takeSeat(car.id)}>
+            {!iAmDriver && !iAmInThisCar && freeSeats > 0 && (
+              <Button size="sm" variant="teal" className="w-full" onClick={() => takeSeat(car.id)}>
                 Prendi un posto
               </Button>
             )}
             {!iAmThisDriver && iAmInThisCar && (
-              <Button size="sm" variant="outline" onClick={leaveSeat}>
+              <Button size="sm" variant="outline" className="w-full" onClick={leaveSeat}>
                 Lascia il posto
               </Button>
+            )}
+
+            {showTravelZone && (
+              <div className="mt-3 space-y-3 border-t border-border-soft pt-2.5">
+                <DelayReportBadge
+                  carId={car.id}
+                  currentMemberId={currentMember.id}
+                  canReport={canReportOrPropose}
+                  activeDelay={activeDelay}
+                />
+                <StopProposalsSection
+                  roomId={roomId}
+                  carId={car.id}
+                  currentMember={currentMember}
+                  eligibleMembers={[car.driver_member_id, ...passengers.map((p) => p.member_id)]
+                    .map((id) => memberById(id))
+                    .filter((m): m is Member => !!m)}
+                  proposals={carProposals}
+                  votes={stopProposalVotes}
+                  canPropose={canReportOrPropose}
+                  title="Proposte per quest'auto"
+                />
+              </div>
             )}
 
             {expenses.length > 0 && (
@@ -249,7 +262,7 @@ export default function AutoTab({
                     <span className="flex items-center gap-1.5 text-muted">
                       <Fuel size={11} /> {e.label}
                     </span>
-                    <span className="font-mono text-cream">€{e.amount}</span>
+                    <span className="font-mono text-cream">{formatMoney(e.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -281,7 +294,7 @@ export default function AutoTab({
             .filter((m) => !rideRequests.some((r) => r.member_id === m.id && r.status === 'pending'))
             .map((m) => (
             <Card key={m.id} tone="dashed" className="flex items-center justify-between !p-3.5">
-              <p className="text-[13.5px] text-cream">{m.display_name}</p>
+              <p className="text-[13px] text-cream">{m.display_name}</p>
               {cars.length > 0 && (
                 <select
                   defaultValue=""
@@ -328,18 +341,19 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
   async function addItem(e: FormEvent) {
     e.preventDefault()
     if (!item.trim()) return
-    await mutateNotify(
+    const { error } = await mutateNotify(
       'car_cargo.insert',
       insertCarCargoItem(carId, item),
       'Oggetto non aggiunto.',
     )
+    if (error) return
     setItem('')
     setAdding(false)
   }
 
   return (
     <div className="border-t border-border-soft pt-2.5">
-      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-[0.15em] text-muted">
+      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted">
         <Package size={11} /> Carico di questa auto
       </p>
       <div className="space-y-1">
@@ -370,7 +384,7 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="mt-2 flex items-center gap-1 font-mono text-[10.5px] text-muted active:opacity-60"
+          className="mt-2 flex items-center gap-1 font-mono text-[10px] text-muted active:opacity-60"
         >
           <Plus size={11} /> aggiungi oggetto
         </button>

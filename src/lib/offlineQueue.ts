@@ -3,11 +3,11 @@ import {
   addToQueue,
   memoryStore,
   readQueue as readQueueFrom,
-  removeFromQueue,
   writeQueue as writeQueueTo,
   type QueueItem,
 } from './offlineQueueStore'
 import { showToast } from './toast'
+import { drainQueue } from './drainQueue'
 
 // Coda offline persistente: le mutazioni fatte senza connessione vengono
 // salvate in localStorage come {name, args} — non il builder Supabase, che
@@ -56,30 +56,12 @@ export async function flushQueue(): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return
   flushing = true
   try {
-    let queue = readQueue()
-    let flushedCount = 0
-    while (queue.length > 0) {
-      const item = queue[0]
+    const { count, failed } = await drainQueue(storage, (item) => {
       const factory = getOpRegistry()[item.name]
-      if (!factory) {
-        queue = removeFromQueue(queue, item.id)
-        writeQueue(queue)
-        emit()
-        continue
-      }
-      const { error } = await factory(...item.args).run()
-      if (error) {
-        showToast(`Sincronizzazione interrotta: ${item.label} non riuscita.`, 'error')
-        break
-      }
-      queue = removeFromQueue(queue, item.id)
-      writeQueue(queue)
-      emit()
-      flushedCount++
-    }
-    if (flushedCount > 0) {
-      showToast(`${flushedCount} modifiche sincronizzate.`, 'success')
-    }
+      return factory ? factory(...item.args).run() : Promise.resolve({ error: 'Operazione non disponibile' })
+    }, emit, () => typeof navigator === 'undefined' || navigator.onLine)
+    if (failed) showToast('Alcune modifiche sono ancora in attesa. Riprova la sincronizzazione.', 'error')
+    if (count > 0) showToast(`${count} modifiche sincronizzate.`, 'success')
   } finally {
     flushing = false
   }
@@ -87,5 +69,6 @@ export async function flushQueue(): Promise<void> {
 
 if (typeof window !== 'undefined') {
   window.addEventListener('online', () => void flushQueue())
-  if (navigator.onLine) void flushQueue()
+  // Attende che tutti i moduli abbiano registrato le proprie operazioni.
+  if (navigator.onLine) queueMicrotask(() => void flushQueue())
 }

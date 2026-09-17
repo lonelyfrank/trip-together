@@ -65,7 +65,7 @@ export default function WeatherStrip({ lat, lng, eventTime }: WeatherStripProps)
       <Icon size={20} className="shrink-0 text-teal" />
       <div className="min-w-0 flex-1">
         <p className="text-[13px] text-cream">{meta.label}</p>
-        <p className="font-mono text-[9.5px] uppercase tracking-[0.12em] text-muted">
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
           {weather.kind === 'forecast' ? 'Previsto per l’evento' : 'Adesso a destinazione'}
         </p>
       </div>

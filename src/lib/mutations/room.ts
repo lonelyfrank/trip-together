@@ -63,7 +63,8 @@ export const updateRoomEventTime = op('rooms.updateEventTime', (roomId: string, 
 )
 
 export const closeRoom = op('rooms.close', (roomId: string) =>
-  supabase.from('rooms').update({ status: 'closed' }).eq('id', roomId),
+  supabase.from('rooms').update({ status: 'closed' }).eq('id', roomId).select('id').single(),
+  { queueable: false },
 )
 
 export const deleteCarsByRoom = op('cars.deleteByRoom', (roomId: string) =>
@@ -140,7 +141,9 @@ export const deleteCarPassengerByMember = op('car_passengers.deleteByMember', (m
 )
 
 export const insertCarPassenger = op('car_passengers.insert', (carId: string, memberId: string) =>
-  supabase.from('car_passengers').insert({ car_id: carId, member_id: memberId }),
+  // Il vincolo unico su member_id rende il cambio auto una sola scrittura:
+  // se fallisce, il posto precedente resta assegnato.
+  supabase.from('car_passengers').upsert({ car_id: carId, member_id: memberId }, { onConflict: 'member_id' }),
 )
 
 export const setCarTravelStatus = op(

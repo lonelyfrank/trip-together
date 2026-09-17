@@ -17,7 +17,7 @@
   --color-highlight-from: #1a1a25;
   --color-highlight-to: #111118;
   --color-cream: #c9c9e0;
-  --color-muted: #7878a0;
+  --color-muted: #9999b5;
   --color-amber: #e8a33d;
   --color-teal: #46d9c9;
   --color-coral: #e76f51;
@@ -37,11 +37,57 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--color-teal);
+    outline-offset: 4px;
+  }
+  button, a, summary { -webkit-tap-highlight-color: transparent; }
+  button:not(:disabled), summary { cursor: pointer; }
+  input, select, textarea { font-size: 16px; }
+}
+
+.sheet { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
+.sheet::backdrop { background: rgb(0 0 0 / 65%); backdrop-filter: blur(5px); }
+.bottom-actions { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
+.page-content { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* I titoli usano ancora l'utility .font-serif ma ora rendono in Roboto:
    li distinguiamo con peso e tracking più stretto invece che con un family serif. */
 .font-serif {
   font-weight: 700;
   letter-spacing: -0.015em;
+}
+
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fade-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes radar-sweep {

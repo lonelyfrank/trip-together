@@ -1,36 +1,67 @@
-# Trip Together — demo MVP
+# Trip Together
 
-Cruscotto realtime per un evento tra amici: stanza + destinazione condivisa + auto (posti) +
-radar di prossimità. Nessun login — identità di "Livello 0" via sessione anonima Supabase
-(vedi sezione 4/15 dello spec di prodotto). Spese, carico auto, bacheca, comitiva riutilizzabile
-e i livelli di identità superiori sono fuori scope in questa fase di validazione.
+Organizzazione di eventi tra amici: inviti senza account, comitive riutilizzabili,
+auto e passaggi, checklist, bacheca, spese e radar attivato esplicitamente.
+React + TypeScript + Vite, con Supabase e TanStack Query.
 
-## Setup
+## Avvio
 
-1. Crea un progetto su [supabase.com](https://supabase.com).
-2. In **Authentication → Sign In / Providers**, abilita **Anonymous sign-ins**.
-3. Apri lo **SQL Editor** e incolla il contenuto di [`supabase/schema.sql`](supabase/schema.sql).
-4. Copia `.env.example` in `.env` e inserisci `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY`
-   (Project Settings → API).
-5. `npm install`
-6. `npm run dev`
+1. Configura un progetto Supabase e abilita **Anonymous sign-ins**.
+2. Segui [le istruzioni database](supabase/README.md) per lo schema. Non usare
+   `supabase/schema.sql` come script di installazione: contiene operazioni distruttive.
+3. Copia `.env.example` in `.env` e configura `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_ANON_KEY`.
+4. Esegui `npm install` e `npm run dev`.
+5. Apri l'indirizzo HTTPS indicato da Vite, normalmente `https://localhost:5173`.
+   Il certificato di sviluppo è locale. Per un telefono sulla stessa rete usa
+   l'indirizzo Network mostrato da Vite; il radar richiede un contesto HTTPS attendibile.
 
-## Testare il radar da telefono
+## Verifiche
 
-La Geolocation API del browser richiede HTTPS (o `localhost`). Per testare da un telefono reale
-sulla stessa rete, esponi il dev server con un tunnel:
-
+```bash
+npm run check       # TypeScript e lint
+npm test            # Test della logica, inclusa la sincronizzazione della coda
+npm run build       # Build di produzione
+npm run db:check    # Controllo delle tabelle sul progetto Supabase configurato
 ```
-npx localtunnel --port 5173
+
+`scripts/uiSmoke.mjs` verifica nel browser onboarding, focus dei dialoghi, tab
+persistenti, errori di caricamento, retry delle quote, arresto radar e archivio.
+Le richieste Supabase vengono simulate. Richiede Playwright e Chromium disponibili
+nell'ambiente di test, oltre al dev server già avviato:
+
+```bash
+node scripts/uiSmoke.mjs
 ```
 
-oppure genera un certificato locale con `@vitejs/plugin-basic-ssl`.
+Se Playwright è installato in un ambiente esterno, imposta `PLAYWRIGHT_MODULE`
+al percorso del suo modulo `index.mjs`. Puoi specificare il browser con
+`PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` e il server con `UI_BASE_URL`.
+Playwright non è una dipendenza dell'app. Le schermate del controllo sono salvate
+in `/tmp/trip-*.png`.
 
 ## Struttura
 
-- `supabase/schema.sql` — tabelle, RLS, realtime (rooms, members, cars, car_passengers, radar_positions)
-- `src/lib/supabase.ts` — client + sessione anonima
-- `src/hooks/useRoom.ts` — fetch iniziale + sottoscrizioni realtime per una stanza
-- `src/pages/Home.tsx` — crea/entra in una stanza
-- `src/pages/Room.tsx` — cruscotto della stanza
-- `src/components/` — DestinationCard, CarsPanel, RadarPanel
+- `src/App.tsx`: route e caricamento delle pagine su richiesta.
+- `src/pages`: Home, ingresso da invito, recupero, comitive ed evento.
+- `src/components/ui`: componenti condivisi, campi, dialoghi e notifiche.
+- `src/components/room`: riepilogo personale, auto, spese, radar e archivio.
+- `src/hooks/useRoomData.ts`: letture, errori per sezione e aggiornamenti realtime.
+- `src/lib/membership.ts`: creazione e ingresso in eventi e comitive.
+- `src/lib/mutations`: scritture centralizzate.
+- `src/lib/offlineQueue.ts`, `drainQueue.ts`: coda persistente e sincronizzazione.
+- `supabase/migrations/20260724000000_schema.sql`: schema attuale.
+
+Le tab dell'evento sono condivisibili con `?tab=auto`, `?tab=spese`, ecc.
+L'archiviazione conserva i dati e mostra un riepilogo senza controlli di modifica;
+la pulizia delle posizioni radar è separata. Gli eventi archiviati dalla versione
+precedente possono avere già perso parte dei dati, che non vengono ricostruiti.
+
+## Stato del refactoring
+
+Vedi [analisi e piano](docs/PRODUCT_REVIEW.md) e
+[interventi implementati e limiti](docs/REFACTOR_PROGRESS.md).
+La protezione degli accessi nel database resta quella del prototipo: le policy
+sono permissive. Il riepilogo in sola lettura è un comportamento dell'interfaccia,
+non un nuovo vincolo server. Il recupero sicuro dell'identità, le transazioni
+server e il flusso dei rimborsi richiedono ancora il successivo intervento sullo schema.

@@ -134,7 +134,7 @@ export default function BachecaTab({
                 <Link2 size={13} className="text-teal" />
               </div>
               <div>
-                <p className="text-[12.5px] text-cream">{l.label}</p>
+                <p className="text-[13px] text-cream">{l.label}</p>
                 <p className="font-mono text-[10px] text-muted">{l.url}</p>
               </div>
             </div>

@@ -65,7 +65,7 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
               Ritardo: {REASON_LABELS[activeDelay.reason]}
               {activeDelay.minutes_estimate ? ` · ~${activeDelay.minutes_estimate} min` : ''}
             </p>
-            <p className="font-mono text-[9.5px] text-muted">segnalato {formatRelativeTime(activeDelay.created_at)}</p>
+            <p className="font-mono text-[10px] text-muted">segnalato {formatRelativeTime(activeDelay.created_at)}</p>
           </div>
         </div>
         {canReport && (
@@ -81,12 +81,9 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        className="flex items-center justify-center gap-1.5 rounded-xl border border-border-soft py-2 text-[12px] font-medium text-cream transition-transform active:scale-[0.98]"
-      >
+      <Button variant="outline" className="w-full" onClick={() => setOpen(true)}>
         <AlertTriangle size={13} /> Segnala ritardo
-      </button>
+      </Button>
 
       <BottomSheet open={open} onClose={() => setOpen(false)} title="Segnala ritardo">
         <div className="flex flex-col gap-3">

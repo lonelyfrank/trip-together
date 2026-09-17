@@ -24,6 +24,7 @@ import type {
 
 export interface RoomPayload {
   error: PostgrestError | null
+  sectionErrors: Partial<Record<'auto' | 'spese' | 'bacheca' | 'radar', PostgrestError | null>>
   room: Room | null
   members: Member[]
   cars: Car[]
@@ -44,6 +45,7 @@ export interface RoomPayload {
 
 const EMPTY_PAYLOAD: RoomPayload = {
   error: null,
+  sectionErrors: {},
   room: null,
   members: [],
   cars: [],
@@ -67,7 +69,7 @@ export const roomDataKey = (roomId: string) => ['room-data', roomId] as const
 // Config unica: tabella → collezione nel payload + colonne di primary key.
 // Guida sia le sottoscrizioni realtime (tutte filtrate per room_id) sia le
 // patch mirate della cache. `id` dove non indicato.
-type CollectionKey = Exclude<keyof RoomPayload, 'error' | 'room'>
+type CollectionKey = Exclude<keyof RoomPayload, 'error' | 'room' | 'sectionErrors'>
 const TABLES: { table: string; key: CollectionKey; pk: string[] }[] = [
   { table: 'members', key: 'members', pk: ['id'] },
   { table: 'cars', key: 'cars', pk: ['id'] },
@@ -134,10 +136,15 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
   ])
 
   return {
-    // Solo le query essenziali determinano lo stato d'errore della stanza: le
-    // tabelle-feature che falliscono (o la cui colonna manca) degradano a vuoto
-    // — l'errore è comunque loggato da query(), quindi mai silenzioso.
+    // Gli errori di una funzionalità non nascondono l'intero evento, ma non
+    // possono essere interpretati come liste vuote o saldi a zero.
     error: firstError(roomQ, membersQ, carsQ),
+    sectionErrors: {
+      auto: firstError(carPassengersQ, carCargoQ, carExpensesQ, delayReportsQ, stopProposalsQ, stopProposalVotesQ, rideRequestsQ),
+      spese: firstError(carPassengersQ, carExpensesQ, generalExpensesQ, generalExpenseParticipantsQ),
+      bacheca: firstError(boardNotesQ, boardLinksQ, roomChecklistQ),
+      radar: firstError(radarQ),
+    },
     room: single(roomQ),
     members: rows(membersQ),
     cars: rows(carsQ),
@@ -192,7 +199,7 @@ function applyChange(
 export function useRoomData(roomId: string | undefined) {
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error: queryError, refetch } = useQuery({
     queryKey: roomId ? roomDataKey(roomId) : ['room-data', 'none'],
     queryFn: () => fetchRoomData(roomId!),
     enabled: !!roomId,
@@ -246,5 +253,5 @@ export function useRoomData(roomId: string | undefined) {
     }
   }, [roomId, queryClient])
 
-  return { isLoading: !!roomId && isLoading, ...(data ?? EMPTY_PAYLOAD) }
+  return { isLoading: !!roomId && isLoading, ...(data ?? EMPTY_PAYLOAD), error: queryError ?? data?.error ?? null, refetch }
 }

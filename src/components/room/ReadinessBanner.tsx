@@ -45,7 +45,7 @@ export default function ReadinessBanner({ room, currentMember, members, cars, ca
         </span>
       </div>
 
-      <p className="mb-1 text-[12.5px] text-muted">
+      <p className="mb-1 text-[13px] text-muted">
         {confirmedCount}/{members.length} confermati
         {withoutCarCount > 0 && ` · ${withoutCarCount} senza auto assegnata`}
       </p>

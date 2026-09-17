@@ -15,7 +15,7 @@ interface CardProps {
 }
 
 export default function Card({ children, tone = 'surface', className = '', onClick }: CardProps) {
-  const base = `rounded-[20px] p-4 transition-transform ${TONES[tone]} ${className}`
+  const base = `rounded-2xl p-4 transition-transform ${TONES[tone]} ${className}`
 
   if (onClick) {
     return (

@@ -1,6 +1,9 @@
 import { AlertTriangle, Plus } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
+import BottomSheet from '../ui/BottomSheet'
+import TextField from '../ui/TextField'
+import { formatMoney } from '../../lib/format'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
@@ -40,6 +43,8 @@ export default function SpeseTab({
   const [paidBy, setPaidBy] = useState(currentMember.id)
   const [participantIds, setParticipantIds] = useState<string[]>(members.map((m) => m.id))
   const [saving, setSaving] = useState(false)
+  const [savedExpenseId, setSavedExpenseId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const optimistic = useRoomOptimistic(roomId)
 
   const memberById = (id: string) => members.find((m) => m.id === id)
@@ -48,6 +53,7 @@ export default function SpeseTab({
   const balances = computeBalances({ cars, carPassengers, carExpenses, generalExpenses, generalExpenseParticipants })
   const transfers = computeTransfers(balances)
   const hasOpenBalance = transfers.length > 0
+  const myBalance = balances.find((balance) => balance.memberId === currentMember.id)?.net ?? 0
 
   const carTotal = carExpenses.reduce((s, e) => s + e.amount, 0)
   const generalTotal = generalExpenses.filter((e) => !e.waived).reduce((s, e) => s + e.amount, 0)
@@ -73,27 +79,35 @@ export default function SpeseTab({
   async function addExpense(e: FormEvent) {
     e.preventDefault()
     const value = Number(amount)
-    if (!label.trim() || !value || participantIds.length === 0) return
+    if (saving || !label.trim() || !Number.isFinite(value) || value <= 0 || participantIds.length === 0) return
     setSaving(true)
+    setSaveError(null)
     try {
-      const expenseId = crypto.randomUUID()
-      const { error } = await mutateNotify(
-        'general_expenses.insert',
-        insertGeneralExpense(expenseId, roomId, label, value, paidBy),
-        'Spesa non salvata.',
-      )
-      if (error) return
+      const expenseId = savedExpenseId ?? crypto.randomUUID()
+      if (!savedExpenseId) {
+        const { error } = await mutateNotify(
+          'general_expenses.insert',
+          insertGeneralExpense(expenseId, roomId, label, value, paidBy),
+          'Spesa non salvata.',
+        )
+        if (error) { setSaveError('Spesa non salvata. Riprova.'); return }
+        setSavedExpenseId(expenseId)
+      }
 
-      await mutateNotify(
+      const { error: participantError } = await mutateNotify(
         'general_expense_participants.insert',
         insertGeneralExpenseParticipants(expenseId, participantIds),
         'Partecipanti spesa non salvati.',
       )
+      if (participantError) { setSaveError('La spesa è stata creata, ma mancano le quote. Riprova per completarla.'); return }
+      setSavedExpenseId(null)
 
       setLabel('')
       setAmount('')
       setParticipantIds(members.map((m) => m.id))
       setAdding(false)
+    } catch {
+      setSaveError('Salvataggio interrotto. Controlla la connessione e riprova.')
     } finally {
       setSaving(false)
     }
@@ -101,11 +115,16 @@ export default function SpeseTab({
 
   return (
     <div className="space-y-3 px-4 pb-28 sm:px-6">
-      <Card tone="highlight" className="flex items-center justify-between">
+      <Card tone="highlight" className="!p-5">
+        <p className="text-xs font-medium uppercase tracking-widest text-muted">Il tuo saldo</p>
+        <p className="mt-3 font-serif text-3xl">{formatMoney(Math.abs(myBalance))}</p>
+        <p className="mt-2 text-sm text-muted">{myBalance > 0 ? 'Da ricevere dal gruppo' : myBalance < 0 ? 'Da restituire al gruppo' : 'Non risultano saldi aperti a tuo nome'}</p>
+      </Card>
+      <Card className="flex items-center justify-between">
         <div>
           <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Totale evento</p>
           <p className="mt-1 font-serif text-[28px] leading-none text-cream">
-            €{(carTotal + generalTotal).toFixed(0)}
+            {formatMoney(carTotal + generalTotal)}
           </p>
         </div>
         {hasOpenBalance && <Chip tone="alert">{transfers.length} saldi aperti</Chip>}
@@ -119,8 +138,8 @@ export default function SpeseTab({
               const total = carExpenses.filter((e) => e.car_id === c.id).reduce((s, e) => s + e.amount, 0)
               return (
                 <div key={c.id} className="flex items-center justify-between rounded-xl bg-surface/60 px-3.5 py-2.5">
-                  <span className="text-[12.5px] text-cream">Auto di {memberById(c.driver_member_id)?.display_name}</span>
-                  <span className="font-mono text-[12.5px] text-cream">€{total}</span>
+                  <span className="text-[13px] text-cream">Auto di {memberById(c.driver_member_id)?.display_name}</span>
+                  <span className="font-mono text-[13px] text-cream">{formatMoney(total)}</span>
                 </div>
               )
             })}
@@ -129,15 +148,15 @@ export default function SpeseTab({
       )}
 
       <div>
-        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Liste generali</p>
+        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Spese del gruppo</p>
         <div className="space-y-2">
           {generalExpenses.map((e) => {
             const participants = generalExpenseParticipants.filter((p) => p.expense_id === e.id)
             return (
               <div key={e.id} className={`rounded-xl px-3.5 py-2.5 ${e.waived ? 'bg-surface/30 opacity-60' : 'bg-surface/60'}`}>
                 <div className="flex items-center justify-between">
-                  <span className="text-[12.5px] text-cream">{e.label}</span>
-                  <span className="font-mono text-[12.5px] text-cream">€{e.amount}</span>
+                  <span className="text-[13px] text-cream">{e.label}</span>
+                  <span className="font-mono text-[13px] text-cream">{formatMoney(e.amount)}</span>
                 </div>
                 <p className="mt-1 font-mono text-[10px] text-muted">
                   pagato da {memberById(e.paid_by_member_id ?? '')?.display_name ?? '—'} · diviso tra {participants.length}
@@ -158,83 +177,38 @@ export default function SpeseTab({
         </div>
       </div>
 
-      {adding ? (
-        <Card>
-          <form onSubmit={addExpense} className="flex flex-col gap-2">
-            <input
-              autoFocus
-              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-[13px] text-cream placeholder:text-muted"
-              placeholder="Es. Ombrelloni e lettini"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-            />
-            <input
-              type="number"
-              step="0.01"
-              min="0"
-              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-[13px] text-cream placeholder:text-muted"
-              placeholder="Importo (€)"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <select
-              value={paidBy}
-              onChange={(e) => setPaidBy(e.target.value)}
-              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-[13px] text-cream"
-            >
-              {members.map((m) => (
-                <option key={m.id} value={m.id}>
-                  Pagato da {m.display_name}
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 font-mono text-[10px] uppercase tracking-[0.15em] text-muted">Diviso tra</p>
-            <div className="flex flex-wrap gap-1.5">
-              {members.map((m) => (
-                <button
-                  type="button"
-                  key={m.id}
-                  onClick={() => toggleParticipant(m.id)}
-                  className={`rounded-full px-2.5 py-1 text-[11px] ${
-                    participantIds.includes(m.id) ? 'bg-teal text-ink' : 'bg-ink text-muted'
-                  }`}
-                >
-                  {m.display_name}
-                </button>
-              ))}
-            </div>
-            <div className="mt-1 flex gap-2">
-              <Button type="submit" size="sm" variant="teal" disabled={saving}>
-                Aggiungi spesa
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setAdding(false)}>
-                Annulla
-              </Button>
-            </div>
-          </form>
-        </Card>
-      ) : (
-        <Button variant="surface" className="w-full" onClick={() => setAdding(true)}>
-          <Plus size={15} /> Nuova lista spesa
-        </Button>
-      )}
+      <Button variant="surface" className="w-full" onClick={() => { setSaveError(null); setAdding(true) }}>
+        <Plus size={17} /> {savedExpenseId ? 'Completa la spesa' : 'Nuova spesa'}
+      </Button>
+      <BottomSheet open={adding} onClose={() => { if (!saving) setAdding(false) }} title={savedExpenseId ? 'Completa la spesa' : 'Nuova spesa'}>
+        <form onSubmit={addExpense} className="space-y-5" aria-busy={saving}>
+          {saveError && <p role="alert" className="rounded-xl bg-coral/10 p-3 text-sm text-coral">{saveError}</p>}
+          <fieldset disabled={saving || !!savedExpenseId} className="space-y-4 disabled:opacity-60">
+            <TextField label="Per cosa avete speso?" autoFocus placeholder="Es. Spesa per il picnic" required maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} />
+            <TextField label="Importo (€)" type="number" inputMode="decimal" step="0.01" min="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} />
+            <label className="block text-sm font-medium">Chi ha pagato?<select value={paidBy} onChange={(event) => setPaidBy(event.target.value)} className="mt-2 min-h-12 w-full rounded-xl border border-border-strong bg-ink px-3 text-base">{members.map((member) => <option key={member.id} value={member.id}>{member.display_name}</option>)}</select></label>
+          </fieldset>
+          <fieldset disabled={saving} className="space-y-3"><legend className="text-sm font-medium">Dividi tra i partecipanti</legend><div className="flex flex-wrap gap-2">{members.map((member) => <button type="button" key={member.id} aria-pressed={participantIds.includes(member.id)} onClick={() => toggleParticipant(member.id)} className={`min-h-11 rounded-full px-4 py-2 text-sm ${participantIds.includes(member.id) ? 'bg-teal text-ink' : 'border border-border-strong text-muted'}`}>{member.display_name}</button>)}</div></fieldset>
+          <Button type="submit" className="w-full" disabled={saving || !label.trim() || Number(amount) <= 0 || !amount || participantIds.length === 0}>{saving ? 'Salvataggio…' : savedExpenseId ? 'Riprova a salvare le quote' : 'Aggiungi spesa'}</Button>
+        </form>
+      </BottomSheet>
 
       {hasOpenBalance && (
         <div>
           <p className="mb-2 mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Chi deve dare a chi</p>
           <div className="space-y-1.5">
             {transfers.map((t, i) => (
-              <div key={i} className="flex items-center justify-between rounded-xl bg-surface/60 px-3.5 py-2.5 text-[12.5px]">
+              <div key={i} className="flex items-center justify-between rounded-xl bg-surface/60 px-3.5 py-2.5 text-[13px]">
                 <span className="text-cream">
                   {memberById(t.fromMemberId)?.display_name} → {memberById(t.toMemberId)?.display_name}
                 </span>
-                <span className="font-mono text-cream">€{t.amount.toFixed(2)}</span>
+                <span className="font-mono text-cream">{formatMoney(t.amount)}</span>
               </div>
             ))}
           </div>
           <div className="mt-3 flex items-start gap-2 rounded-xl border border-coral/25 bg-coral/10 px-4 py-3">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-coral" />
-            <p className="text-[11.5px] leading-relaxed text-cream">
+            <p className="text-[11px] leading-relaxed text-cream">
               Ci sono saldi non ancora chiusi. Non potrai chiudere la stanza finché tutti i conti non sono a zero.
             </p>
           </div>

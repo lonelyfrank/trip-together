@@ -60,11 +60,12 @@ export default function RideRequestsSection({
 
   async function offerSeat(request: RideRequest) {
     if (!myCarWithFreeSeat) return
-    await mutateNotify(
+    const { error } = await mutateNotify(
       'car_passengers.offerSeat',
       insertCarPassenger(myCarWithFreeSeat.id, request.member_id),
       'Posto non offerto.',
     )
+    if (error) return
     await mutateNotify('ride_requests.match', matchRideRequest(request.id, myCarWithFreeSeat.id), 'Match non registrato.')
   }
 

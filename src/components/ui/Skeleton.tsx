@@ -35,7 +35,7 @@ export function SkeletonHeader() {
 /** Placeholder per una riga stile Card con icona + due righe di testo. */
 export function SkeletonCard() {
   return (
-    <div className="flex items-center gap-3 rounded-[20px] border border-border-soft bg-surface/70 p-4">
+    <div className="flex items-center gap-3 rounded-2xl border border-border-soft bg-surface/70 p-4">
       <Skeleton tone="onSurface" className="h-11 w-11 shrink-0 rounded-2xl" />
       <div className="min-w-0 flex-1 space-y-2">
         <Skeleton tone="onSurface" className="h-4 w-2/3" />

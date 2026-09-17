@@ -82,12 +82,9 @@ export default function StopProposalsSection({
       )}
 
       {canPropose && (
-        <button
-          onClick={() => setOpen(true)}
-          className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-border-soft py-2 text-[12px] font-medium text-cream transition-transform active:scale-[0.98]"
-        >
+        <Button variant="outline" className="w-full" onClick={() => setOpen(true)}>
           <Plus size={13} /> Proponi sosta
-        </button>
+        </Button>
       )}
 
       <BottomSheet open={open} onClose={() => setOpen(false)} title="Proponi una sosta">

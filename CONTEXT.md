@@ -29,7 +29,7 @@ Definita come token Tailwind v4 in `src/index.css` (`@theme`). Usare sempre i no
 | `border-dashed` | bordo tratteggiato (slot vuoti) | `#4a4a6a` |
 | `highlight-from` / `highlight-to` | gradiente card evidenziata | `#1a1a25` → `#111118` |
 | `cream` | testo principale | `#c9c9e0` |
-| `muted` | testo secondario | `#7878a0` |
+| `muted` | testo secondario | `#9999b5` |
 | `amber` | accento (stati "in corso/attenzione") | `#e8a33d` |
 | `teal` | accento (stati positivi/attivi) | `#46d9c9` |
 | `coral` | alert (saldi aperti, ritardi, errori) | `#e76f51` |
@@ -42,8 +42,8 @@ Font (Google Fonts, caricati in `index.html`): tutto Roboto. `font-sans` = Robot
 - **`Chip`** — pillola di stato, tone: `muted | amber | teal | alert`.
 - **`Card`** — card `rounded-[20px]`, tone: `surface | highlight | flat | dashed`; passa `onClick` per renderla tappabile (`active:scale-[0.98]` automatico).
 - **`Button`** — variant: `primary | teal | outline | surface`, size: `md | sm`.
-- **`BottomSheet`** — foglio che scorre dal basso (usato da `MapSheet`, dai form di creazione, dai picker come `TravelStatusChip`): non introdurre un nuovo pattern di overlay, riusare questo.
-- **`TabBar`** (in `src/components/`) — tab Stanza/Auto/Bacheca/Spese/Radar con indicatore che scorre.
+- **`BottomSheet`** — dialogo modale nativo, dal basso su mobile e centrato su desktop, con focus confinato, Escape, ritorno del focus e scroll interno (usato da `MapSheet`, dai form di creazione, dai picker come `TravelStatusChip`): non introdurre un nuovo pattern di overlay, riusare questo.
+- **`TabBar`** (in `src/components/`) — navigazione Evento/Auto/Bacheca/Spese/Radar con tab persistente nella query string.
 
 Componenti di dominio in `src/components/room/`: `DestinationCard` (destinazione + `EventTimeRow` per data/ora con salvataggio separato + `WeatherStrip` meteo Open-Meteo), `StanzaTab`/`AutoTab`/`BachecaTab`/`SpeseTab`/`RadarTab`, `TravelStatusChip`, `DelayReportBadge`, `ChecklistSection`, `StopProposalsSection`/`StopProposalCard`, `RideRequestsSection`, `ReadinessBanner`, `CloseRoomSection`.
 
@@ -78,7 +78,18 @@ RLS: **permissiva** (`using (true) with check (true)`) su tutte le tabelle in qu
 
 **Fonte di verità dello schema:** le migration in `supabase/migrations/`, applicate con `supabase db push` (vedi `supabase/README.md`). Verifica rapida: `npm run db:check`. Il codice degrada senza crashare quando una tabella manca (le query supabase-js risolvono con `{data:null}`).
 
-Il hook `src/hooks/useRoomData.ts` centralizza fetch + sottoscrizioni realtime per una stanza; le tabelle senza `room_id` diretto (`car_expenses`, `car_cargo`, `car_passengers`, `delay_reports`, `stop_proposal_votes`) vengono ricaricate per intero ad ogni evento. Analoghi: `useCrewData` (una comitiva + membri + suoi eventi), `useMyRooms`/`useMyCrews` (liste per la Home).
+L'hook `src/hooks/useRoomData.ts` centralizza le letture e il realtime della stanza.
+Le sottoscrizioni sono filtrate per stanza e aggiornano la cache in modo mirato;
+un refetch periodico ogni 20 secondi e la riconnessione riconciliano i dati.
+Gli errori delle funzionalità sono esposti in `sectionErrors`, evitando di mostrare
+liste vuote al posto di letture fallite. Il riepilogo non consente archiviazione
+con dati economici incompleti. Analoghi: `useCrewData`, `useMyRooms`, `useMyCrews`.
+
+Primo refactoring UI: `PersonalSummary` propone l'azione personale, `ArchiveSummary`
+mostra gli eventi chiusi, `TextField` centralizza label e hint, `formatMoney` formatta
+gli importi in euro. L'archiviazione conserva i dati; solo il radar viene ripulito
+separatamente. Le pagine sono caricate su richiesta da `App.tsx`. RLS e protezione
+server dell'archivio sono ancora da completare: vedi `docs/REFACTOR_PROGRESS.md`.
 
 ## Route
 

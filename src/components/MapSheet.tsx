@@ -26,7 +26,7 @@ export default function MapSheet({ open, onClose, lat, lng }: MapSheetProps) {
             rel="noreferrer"
             className="flex items-center justify-between rounded-2xl bg-ink px-4 py-3.5 transition-transform active:scale-[0.98]"
           >
-            <p className="text-[13.5px] font-medium text-cream">{a.name}</p>
+            <p className="text-[13px] font-medium text-cream">{a.name}</p>
             <ChevronRight size={15} className="text-muted" />
           </a>
         ))}

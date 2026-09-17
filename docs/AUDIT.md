@@ -1,5 +1,7 @@
 # AUDIT — stato reale (STEP 0)
 
+> ⚠️ **Documento storico.** Fotografia dello stato *prima* di qualunque fix, usata come base per pianificare gli STEP 1–7. Tutti gli STEP 0→7 sono stati completati (vedi commit `19a2be9`…`063768f` e `8e26bd6`): schema unificato, error/empty separati, realtime filtrato, mutazioni centralizzate con coda offline, identità recuperabile, dashboard per fase, skeleton/empty/error coerenti. I problemi descritti qui sotto **non riflettono più il codice attuale** — utile solo per capire da dove si è partiti.
+>
 > Prodotto il 2026-08-03. Nessuna modifica al codice in questo step: è la base per gli step 1–7.
 > Metodo DB: `curl` sull'endpoint REST Supabase del progetto `bifnswddcovwmpqnvvgi` con la anon key.
 

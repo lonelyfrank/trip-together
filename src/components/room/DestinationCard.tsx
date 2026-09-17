@@ -158,14 +158,9 @@ export default function DestinationCard({ room }: DestinationCardProps) {
             )}
           </div>
 
-          <button
-            type="button"
-            onClick={useMyLocation}
-            disabled={locating}
-            className="flex items-center justify-center gap-1.5 rounded-lg border border-border-soft py-2 text-[12px] font-medium text-cream transition-transform active:scale-[0.98] disabled:opacity-50"
-          >
+          <Button variant="outline" className="w-full" onClick={useMyLocation} disabled={locating}>
             <Crosshair size={13} /> {locating ? 'Rilevamento...' : 'Usa la mia posizione attuale'}
-          </button>
+          </Button>
 
           {lat !== null && lng !== null && linkStatus.kind === 'idle' && (
             <p className="font-mono text-[10px] text-muted">

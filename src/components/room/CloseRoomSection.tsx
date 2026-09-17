@@ -1,15 +1,16 @@
 import { AlertTriangle, Lock } from 'lucide-react'
 import { useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import { computeBalances, computeTransfers } from '../../lib/balances'
-import { mutate } from '../../lib/db'
+import { mutateNotify } from '../../lib/db'
+import { useOnline } from '../../lib/online'
+import { showToast } from '../../lib/toast'
+import { roomDataKey, type RoomPayload } from '../../hooks/useRoomData'
 import {
   closeRoom,
-  deleteBoardLinksByRoom,
-  deleteBoardNotesByRoom,
-  deleteCarsByRoom,
-  deleteGeneralExpensesByRoom,
   deleteRadarPositionsByRoom,
 } from '../../lib/mutations'
 import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member, Room } from '../../types'
@@ -38,6 +39,10 @@ export default function CloseRoomSection({
   onClosed,
 }: CloseRoomSectionProps) {
   const [closing, setClosing] = useState(false)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const online = useOnline()
+  const queryClient = useQueryClient()
 
   if (currentMember.role !== 'creator' || room.status === 'closed') return null
 
@@ -46,18 +51,23 @@ export default function CloseRoomSection({
   const hasOpenBalance = transfers.length > 0
 
   async function handleClose() {
-    if (!window.confirm('Chiudere la stanza? Auto, spese, bacheca e radar verranno cancellati definitivamente.')) {
-      return
-    }
+    if (closing || !online || hasOpenBalance) return
     setClosing(true)
+    setError(null)
     try {
-      await mutate('cars.deleteByRoom', deleteCarsByRoom(room.id))
-      await mutate('general_expenses.deleteByRoom', deleteGeneralExpensesByRoom(room.id))
-      await mutate('board_notes.deleteByRoom', deleteBoardNotesByRoom(room.id))
-      await mutate('board_links.deleteByRoom', deleteBoardLinksByRoom(room.id))
-      await mutate('radar_positions.deleteByRoom', deleteRadarPositionsByRoom(room.id))
-      await mutate('rooms.close', closeRoom(room.id))
+      const result = await mutateNotify('rooms.close', closeRoom(room.id), 'Evento non archiviato.')
+      if (result.error) { setError('Archiviazione non riuscita. Riprova.'); return }
+      // Lo storico rimane intatto. Il radar è effimero e viene ripulito a parte.
+      void mutateNotify('radar_positions.deleteByRoom', deleteRadarPositionsByRoom(room.id), 'Evento archiviato, ma la pulizia delle posizioni non è riuscita.').catch(() => showToast('Pulizia delle posizioni non riuscita.', 'error'))
+      queryClient.setQueryData<RoomPayload>(roomDataKey(room.id), (previous) => previous?.room ? { ...previous, room: { ...previous.room, status: 'closed' } } : previous)
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['my-rooms'] }),
+        queryClient.invalidateQueries({ queryKey: ['crew-data'] }),
+      ])
+      setConfirming(false)
       onClosed()
+    } catch {
+      setError('Archiviazione non riuscita. Controlla la connessione e riprova.')
     } finally {
       setClosing(false)
     }
@@ -67,15 +77,15 @@ export default function CloseRoomSection({
     <Card tone={hasOpenBalance ? 'surface' : 'highlight'} className="mt-1">
       <div className="mb-2 flex items-center gap-1.5 text-muted">
         <Lock size={13} strokeWidth={2.5} />
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em]">Chiusura stanza</span>
+        <span className="text-xs font-medium uppercase tracking-widest">Archivia evento</span>
       </div>
 
       {hasOpenBalance ? (
         <>
           <div className="flex items-start gap-2 rounded-xl border border-coral/25 bg-coral/10 px-4 py-3">
             <AlertTriangle size={14} className="mt-0.5 shrink-0 text-coral" />
-            <p className="text-[11.5px] leading-relaxed text-cream">
-              {transfers.length} saldi non ancora saldati. Salda o condona i debiti prima di chiudere.
+            <p className="text-[11px] leading-relaxed text-cream">
+              Ci sono {transfers.length} saldi aperti. Controlla il riepilogo prima di archiviare.
             </p>
           </div>
           <button onClick={onGoToSpese} className="mt-2 font-mono text-[11px] text-muted underline">
@@ -84,15 +94,20 @@ export default function CloseRoomSection({
         </>
       ) : (
         <>
-          <p className="mb-3 text-[12.5px] text-muted">
-            Tutti i conti sono a zero. Chiudendo la stanza, auto, spese, bacheca e radar verranno cancellati —
-            la stanza resterà visibile come archiviata.
+          <p className="mb-3 text-[13px] text-muted">
+            L’evento resterà consultabile con partecipanti, auto, spese e bacheca. Le posizioni radar verranno rimosse.
           </p>
-          <Button variant="outline" className="w-full" onClick={handleClose} disabled={closing}>
-            {closing ? 'Chiusura...' : 'Chiudi stanza'}
+          <Button variant="outline" className="w-full" onClick={() => setConfirming(true)} disabled={closing || !online}>
+            Archivia evento
           </Button>
+          {!online && <p className="mt-2 text-sm text-muted">Torna online per archiviare l’evento.</p>}
         </>
       )}
+      <BottomSheet open={confirming} onClose={() => { if (!closing) setConfirming(false) }} title="Archivia questo evento?">
+        <p className="mb-5 text-sm leading-relaxed text-muted">Potrai rileggere il riepilogo dalla Home. Nell’archivio le modifiche non saranno disponibili.</p>
+        {error && <p role="alert" className="mb-4 text-sm text-coral">{error}</p>}
+        <Button className="w-full" onClick={handleClose} disabled={closing || !online || hasOpenBalance}>{closing ? 'Archiviazione…' : 'Conferma archiviazione'}</Button>
+      </BottomSheet>
     </Card>
   )
 }

@@ -8,8 +8,8 @@ const VARIANTS = {
 } as const
 
 const SIZES = {
-  md: 'py-2.5 px-4 text-[13px] rounded-xl',
-  sm: 'py-1.5 px-3 text-[11px] rounded-lg',
+  md: 'min-h-12 py-3 px-4 text-sm rounded-xl',
+  sm: 'min-h-11 py-2 px-3 text-xs rounded-xl',
 } as const
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

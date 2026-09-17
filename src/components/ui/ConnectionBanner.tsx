@@ -1,7 +1,7 @@
 import { WifiOff } from 'lucide-react'
 import { useSyncExternalStore } from 'react'
 import { useOnline } from '../../lib/online'
-import { getQueueSize, subscribeQueue } from '../../lib/offlineQueue'
+import { flushQueue, getQueueSize, subscribeQueue } from '../../lib/offlineQueue'
 
 /** Banner discreto (non modale): stato offline e/o modifiche in coda da sincronizzare. */
 export default function ConnectionBanner() {
@@ -11,15 +11,20 @@ export default function ConnectionBanner() {
 
   const message =
     online && queueSize > 0
-      ? `Sincronizzazione di ${queueSize} modifiche in corso…`
+      ? `${queueSize} modifiche in attesa di sincronizzazione`
       : queueSize > 0
         ? `Sei offline — ${queueSize} modifiche in coda, partiranno al ritorno online`
         : 'Sei offline — le modifiche partiranno al ritorno online'
 
   return (
-    <div className="fixed inset-x-0 top-0 z-50 mx-auto flex max-w-lg items-center justify-center gap-2 bg-coral/15 px-4 py-1.5 text-coral backdrop-blur">
+    <div
+      role="status"
+      className="sticky inset-x-0 top-0 z-20 mx-auto flex items-center justify-center gap-2 bg-ink-deep px-4 py-2 text-coral"
+      style={{ animation: 'fade-slide-down 0.22s ease-out' }}
+    >
       <WifiOff size={13} />
-      <span className="font-mono text-[11px]">{message}</span>
+      <span className="text-xs">{message}</span>
+      {online && queueSize > 0 && <button type="button" onClick={() => void flushQueue()} className="min-h-11 shrink-0 px-2 text-sm underline">Riprova</button>}
     </div>
   )
 }

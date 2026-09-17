@@ -15,7 +15,7 @@ import type {
 } from '../../types'
 import CloseRoomSection from './CloseRoomSection'
 import DestinationCard from './DestinationCard'
-import ReadinessBanner from './ReadinessBanner'
+import PersonalSummary from './PersonalSummary'
 
 interface StanzaTabProps {
   room: Room
@@ -29,6 +29,7 @@ interface StanzaTabProps {
   onGoToSpese: () => void
   onGoToAuto: () => void
   onClosed: () => void
+  dataIncomplete: boolean
 }
 
 function roleLabel(memberId: string, cars: Car[], carPassengers: CarPassenger[]) {
@@ -49,6 +50,7 @@ export default function StanzaTab({
   onGoToSpese,
   onGoToAuto,
   onClosed,
+  dataIncomplete,
 }: StanzaTabProps) {
   const [shared, setShared] = useState(false)
   const [recoveryCopiedFor, setRecoveryCopiedFor] = useState<string | null>(null)
@@ -86,69 +88,77 @@ export default function StanzaTab({
   }
 
   return (
-    <div className="space-y-3 px-4 pb-28 sm:px-6">
-      {phase === 'pre' && (
-        <ReadinessBanner
+    <div className="page-content grid items-start gap-5 px-4 sm:px-6 md:grid-cols-2">
+      <div className="space-y-5">
+        <PersonalSummary
           room={room}
           currentMember={currentMember}
           members={members}
           cars={cars}
           carPassengers={carPassengers}
+          carExpenses={carExpenses}
+          generalExpenses={generalExpenses}
+          generalExpenseParticipants={generalExpenseParticipants}
+          dataIncomplete={dataIncomplete}
           onGoToAuto={onGoToAuto}
+          onGoToSpese={onGoToSpese}
         />
-      )}
 
-      <DestinationCard room={room} />
-
-      <div>
-        <p className="mb-2.5 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">
-          Partecipanti · {members.length}
-        </p>
-        <div className="space-y-1.5">
-          {members.map((m) => (
-            <div key={m.id} className="flex items-center justify-between rounded-xl bg-surface/50 px-3 py-2.5">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber text-[11px] font-semibold text-ink">
-                  {m.display_name[0]?.toUpperCase()}
-                </div>
-                <span className="text-[13.5px] text-cream">
-                  {m.display_name}
-                  {m.id === currentMember.id && <span className="text-muted"> (tu)</span>}
-                </span>
-              </div>
-              <div className="flex items-center gap-2.5">
-                <span className="font-mono text-[10px] text-muted">{roleLabel(m.id, cars, carPassengers)}</span>
-                <button
-                  onClick={() => shareRecoveryLink(m)}
-                  title={`Link di recupero per ${m.display_name}`}
-                  className="text-muted transition-colors active:text-teal"
-                >
-                  {recoveryCopiedFor === m.id ? <Check size={14} className="text-teal" /> : <LifeBuoy size={14} />}
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+        <DestinationCard room={room} />
       </div>
 
-      {phase === 'pre' && (
-        <Button variant="surface" className="w-full" onClick={invite}>
-          {shared ? <Check size={15} /> : <Share2 size={15} />}
-          {shared ? 'Link copiato!' : 'Invita amici'}
-        </Button>
-      )}
+      <div className="space-y-5">
+        <section>
+          <h2 className="mb-3 text-xs font-medium uppercase tracking-widest text-muted">
+            Partecipanti · {members.length}
+          </h2>
+          <div className="space-y-1.5">
+            {members.map((m) => (
+              <div key={m.id} className="flex items-center justify-between rounded-xl bg-surface/50 px-3 py-2.5">
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber text-[11px] font-semibold text-ink">
+                    {m.display_name[0]?.toUpperCase()}
+                  </div>
+                  <span className="text-[13px] text-cream">
+                    {m.display_name}
+                    {m.id === currentMember.id && <span className="text-muted"> (tu)</span>}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <span className="font-mono text-[10px] text-muted">{roleLabel(m.id, cars, carPassengers)}</span>
+                  <button
+                    onClick={() => shareRecoveryLink(m)}
+                    title={`Link di recupero per ${m.display_name}`}
+                    aria-label={`Link di recupero per ${m.display_name}`}
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-muted transition-colors active:text-teal"
+                  >
+                    {recoveryCopiedFor === m.id ? <Check size={14} className="text-teal" /> : <LifeBuoy size={14} />}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-      <CloseRoomSection
-        room={room}
-        currentMember={currentMember}
-        cars={cars}
-        carPassengers={carPassengers}
-        carExpenses={carExpenses}
-        generalExpenses={generalExpenses}
-        generalExpenseParticipants={generalExpenseParticipants}
-        onGoToSpese={onGoToSpese}
-        onClosed={onClosed}
-      />
+        {phase === 'pre' && (
+          <Button variant="surface" className="w-full" onClick={invite}>
+            {shared ? <Check size={15} /> : <Share2 size={15} />}
+            {shared ? 'Link copiato!' : 'Invita amici'}
+          </Button>
+        )}
+
+        {!dataIncomplete && <details className="rounded-2xl border border-border-soft p-4"><summary className="text-sm text-muted">Opzioni dell’evento</summary><CloseRoomSection
+          room={room}
+          currentMember={currentMember}
+          cars={cars}
+          carPassengers={carPassengers}
+          carExpenses={carExpenses}
+          generalExpenses={generalExpenses}
+          generalExpenseParticipants={generalExpenseParticipants}
+          onGoToSpese={onGoToSpese}
+          onClosed={onClosed}
+        /></details>}
+      </div>
     </div>
   )
 }
