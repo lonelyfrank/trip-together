@@ -137,6 +137,23 @@ appartenenze isolate. Nessun dato utente modificato.
 La rieseguibilità del blocco SQL è stata revisionata staticamente, senza una
 seconda applicazione DDL. Il lock impedisce scritture fra deduplica e indice.
 
+## Fase 3 — completata
+
+Fase 2: commit `dfd99ce` (`correggi orari ordine delle liste e quote duplicate`).
+
+- Poll di sicurezza a 90 secondi, sospeso a pagina nascosta; evento realtime
+  recente salta il poll, ritorno in primo piano rilegge subito. Listener rimossi
+  all'unmount. Test con clock controllato sui confini della finestra e sul ritorno.
+- Home: due query invece di cinque; rimossi openBalance, radarActive e memberId.
+  Eliminata anche general_expenses, che alimentava soltanto openBalance.
+- Meteo TanStack Query con chiave lat/lng/eventDate e staleTime/gcTime 30 minuti.
+  Nel browser tre cambi di tab mantengono una sola richiesta meteo.
+- Lettura localStorage memoizzata già completata durante la fase 1.
+- `npm run check && npm test && npm run build`: superato (11 file di test).
+- Smoke UI superato, incluse le prove delle fasi precedenti. La verifica delle
+  richieste Home esclude le sonde di checkSchema, presenti solo in DEV.
+- Nessuno SQL aggiuntivo e nessuna dipendenza aggiunta.
+
 ## Fasi successive
 
-Fasi 3–5: da implementare, con gli ulteriori punti di conferma SQL previsti dal piano.
+Fasi 4–5: da implementare, con conferma dello SQL di fase 4 prima del client dipendente.

@@ -16,7 +16,7 @@ async function context(fixture=false) {
   if(fixture) await ctx.addInitScript(({roomId,memberId})=>{localStorage.setItem('tripTogether:rooms',JSON.stringify([{roomId,memberId,inviteCode:'LAGO42'}]));localStorage.setItem('tripTogether:myName','Franco')},{roomId,memberId});
   await ctx.route('**/*.supabase.co/**',route=>{
     const req=route.request(), url=new URL(req.url()), table=url.pathname.split('/').pop(), method=req.method();
-    state.requests.push({table,method,order:url.searchParams.get('order'),onConflict:url.searchParams.get('on_conflict')});
+    state.requests.push({table,method,order:url.searchParams.get('order'),onConflict:url.searchParams.get('on_conflict'),select:url.searchParams.get('select')});
     if(table===state.failTable) return route.fulfill({status:500,json:{message:'Simulated error',code:'TEST'}});
     if(url.pathname.includes('/auth/')) return route.fulfill({json:{access_token:'mock-token',refresh_token:'mock-refresh',expires_in:3600,token_type:'bearer',user:{id:'user',aud:'authenticated',role:'authenticated'}}});
     if(!fixture) return route.fulfill({json:[]});
@@ -154,6 +154,25 @@ try {
     assert.equal(await page.getByRole('dialog').getByText('~5 min',{exact:true}).count(),1);
     assert.equal(await page.getByRole('button',{name:'Segnala',exact:true}).isEnabled(),true);
     console.log('PASS data inverno/estate senza slittamento al secondo salvataggio; note, link, soste e ritardi conservati su errore');
+    await ctx.close();
+  }
+  {
+    const {ctx,page,state}=await context(true);
+    let weatherRequests=0;
+    await ctx.route('https://api.open-meteo.com/**',route=>{weatherRequests++;return route.fulfill({json:{current:{temperature_2m:20,weather_code:0}}})});
+    state.tables.rooms[0].destination_lat=45;state.tables.rooms[0].destination_lng=9;
+    await page.goto(`${base}/room/${roomId}`);await page.getByText('Sereno',{exact:true}).waitFor();
+    assert.equal(weatherRequests,1);
+    for(let i=0;i<3;i++) {
+      await page.getByRole('button',{name:'Bacheca',exact:true}).click();
+      await page.getByRole('button',{name:'Evento',exact:true}).click();
+      await page.getByText('Sereno',{exact:true}).waitFor();
+    }
+    assert.equal(weatherRequests,1);
+    state.requests.length=0;
+    await page.goto(base);await page.getByRole('button',{name:/Domenica al lago/}).waitFor();
+    assert.equal(state.requests.filter(req=>['car_expenses','general_expenses','radar_positions'].includes(req.table)&&!['id','member_id'].includes(req.select)).length,0);
+    console.log('PASS meteo riutilizzato dopo tre cambi tab; Home senza query spese/radar inutilizzate');
     await ctx.close();
   }
   assert.deepEqual(errors,[]);console.log('PASS nessun errore JavaScript');

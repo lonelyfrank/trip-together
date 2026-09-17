@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
 import { COLLECTION_ORDER, orderCollection } from '../lib/collectionOrder'
 import { firstError, query, rows, single } from '../lib/db'
+import { roomRefresh, ROOM_POLL_MS } from '../lib/roomRefresh'
 import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type {
   BoardLink,
@@ -218,7 +219,9 @@ export function useRoomData(roomId: string | undefined) {
 
     const invalidate = () => queryClient.invalidateQueries({ queryKey: roomDataKey(roomId) })
 
+    const refresh = roomRefresh(() => { void invalidate() }, () => !document.hidden)
     const patch = (table: string) => (payload: { eventType: string; new: Row; old: Row }) => {
+      refresh.onEvent()
       queryClient.setQueryData(roomDataKey(roomId), (prev?: RoomPayload) =>
         prev ? applyChange(prev, table, payload.eventType as 'INSERT' | 'UPDATE' | 'DELETE', payload.new, payload.old) : prev,
       )
@@ -243,16 +246,14 @@ export function useRoomData(roomId: string | undefined) {
       if (payload.extension === 'postgres_changes' && payload.status === 'ok') void invalidate()
     }).subscribe()
 
-    // Rete di sicurezza incondizionata: il canale può restare "SUBSCRIBED"
-    // senza però consegnare un evento specifico (drift di schema su un
-    // filtro, o altre cause fuori dal nostro controllo — verificato: capita
-    // anche su tabelle non toccate dal drift noto). Un refetch periodico a
-    // bassa frequenza garantisce comunque eventual consistency, indipendente
-    // dallo stato riportato dal canale.
-    const pollId = setInterval(invalidate, 20_000)
+    // La rilettura copre i periodi in cui il canale tace, senza fare 16 query
+    // ogni 20 secondi anche in background o mentre arrivano già eventi.
+    const pollId = setInterval(refresh.poll, ROOM_POLL_MS)
+    document.addEventListener('visibilitychange', refresh.onVisible)
 
     return () => {
       clearInterval(pollId)
+      document.removeEventListener('visibilitychange', refresh.onVisible)
       supabase.removeChannel(channel)
     }
   }, [roomId, queryClient])

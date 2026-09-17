@@ -1,6 +1,6 @@
 import { Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudRain, CloudSnow, CloudSun, Sun } from 'lucide-react'
-import { useEffect, useState } from 'react'
-import { fetchWeather, weatherMeta, type WeatherResult } from '../../lib/weather'
+import { useQuery } from '@tanstack/react-query'
+import { fetchWeather, weatherMeta } from '../../lib/weather'
 
 const ICONS = {
   sun: Sun,
@@ -20,36 +20,18 @@ interface WeatherStripProps {
 }
 
 export default function WeatherStrip({ lat, lng, eventTime }: WeatherStripProps) {
-  const [weather, setWeather] = useState<WeatherResult | null>(null)
-  const [state, setState] = useState<'loading' | 'ok' | 'error'>('loading')
-
   const eventDate = eventTime ? eventTime.slice(0, 10) : null
+  const { data: weather, isPending, isError } = useQuery({
+    queryKey: ['weather', lat, lng, eventDate],
+    queryFn: () => fetchWeather(lat, lng, eventDate),
+    staleTime: 30 * 60_000,
+    gcTime: 30 * 60_000,
+  })
 
-  useEffect(() => {
-    let cancelled = false
-    setState('loading')
-    fetchWeather(lat, lng, eventDate)
-      .then((result) => {
-        if (cancelled) return
-        if (result) {
-          setWeather(result)
-          setState('ok')
-        } else {
-          setState('error')
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setState('error')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [lat, lng, eventDate])
-
-  if (state === 'loading') {
+  if (isPending) {
     return <div className="mt-3 h-9 animate-pulse rounded-xl bg-ink/60" />
   }
-  if (state === 'error' || !weather) {
+  if (isError || !weather) {
     return (
       <p className="mt-3 rounded-xl bg-ink/60 px-3 py-2 font-mono text-[10px] text-muted">
         Meteo non disponibile al momento.
