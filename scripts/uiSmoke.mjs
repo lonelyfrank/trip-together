@@ -14,7 +14,7 @@ async function context(fixture=false) {
     cars:[], car_passengers:[], car_expenses:[], general_expenses:[], general_expense_participants:[], radar_positions:[]
   }};
   if(fixture) await ctx.addInitScript(({roomId,memberId})=>{localStorage.setItem('tripTogether:rooms',JSON.stringify([{roomId,memberId,inviteCode:'LAGO42'}]));localStorage.setItem('tripTogether:myName','Franco')},{roomId,memberId});
-  await ctx.route('**/*.supabase.co/**',async route=>{
+  await ctx.route('**/*.supabase.co/**',route=>{
     const req=route.request(), url=new URL(req.url()), table=url.pathname.split('/').pop(), method=req.method();
     state.requests.push({table,method});
     if(table===state.failTable || table==='general_expense_participants' && method==='POST' && state.failParticipants) return route.fulfill({status:500,json:{message:'Simulated error',code:'TEST'}});

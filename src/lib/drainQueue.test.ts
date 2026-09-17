@@ -25,7 +25,7 @@ test('flush conserva le operazioni aggiunte mentre una richiesta è in corso', a
 test('un errore conserva la richiesta fallita e le operazioni successive', async () => {
   const store = memoryStore()
   writeQueue([item('a'), item('b')], store)
-  const result = await drainQueue(store, async () => { throw new Error('rete') }, () => {}, () => true)
+  const result = await drainQueue(store, () => Promise.reject(new Error('rete')), () => {}, () => true)
   assert.equal(result.failed?.id, 'a')
   assert.equal(result.count, 0)
   assert.deepEqual(readQueue(store).map((entry) => entry.id), ['a', 'b'])
@@ -35,7 +35,7 @@ test('il flush si ferma quando la connessione cade', async () => {
   const store = memoryStore()
   let online = true
   writeQueue([item('a'), item('b')], store)
-  const result = await drainQueue(store, async () => { online = false; return { error: null } }, () => {}, () => online)
+  const result = await drainQueue(store, () => { online = false; return Promise.resolve({ error: null }) }, () => {}, () => online)
   assert.equal(result.count, 1)
   assert.deepEqual(readQueue(store).map((entry) => entry.id), ['b'])
 })
