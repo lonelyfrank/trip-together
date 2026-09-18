@@ -136,7 +136,7 @@ export default function AutoTab({
   const roomWideProposals = visibleProposals.filter((p) => p.car_id === null)
 
   return (
-    <div className="space-y-3 px-4 pb-28 sm:px-6">
+    <div className="space-y-3">
       <StopProposalsSection
         roomId={roomId}
         carId={null}

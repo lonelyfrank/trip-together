@@ -74,7 +74,7 @@ export default function BachecaTab({
   }
 
   return (
-    <div className="space-y-3 px-4 pb-28 sm:px-6">
+    <div className="space-y-3">
       <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Note</p>
       <div className="space-y-2">
         {notes.map((n) => (

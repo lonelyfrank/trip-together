@@ -3,11 +3,13 @@ import AlertBanner from '../../components/ui/AlertBanner'
 import Button from '../../components/ui/Button'
 import SectionHeader from '../../components/ui/SectionHeader'
 import BachecaTab from '../../components/room/BachecaTab'
+import PaymentsSummaryCard from '../../components/room/PaymentsSummaryCard'
 import CloseRoomSection from '../../components/room/CloseRoomSection'
 import MembersSection from '../../components/room/MembersSection'
 import RadarTab from '../../components/room/RadarTab'
 import SpeseTab from '../../components/room/SpeseTab'
 import { useRoomContext } from '../../hooks/useRoomContext'
+import { computePayments } from '../../lib/payments'
 
 // Centro di coordinamento: chi c'è, chi ha pagato, chi porta cosa, cosa è
 // stato deciso, dove sono tutti.
@@ -46,16 +48,30 @@ export default function Group() {
         {sectionErrors.spese ? (
           sectionError
         ) : (
-          <SpeseTab
-            roomId={room.id}
-            currentMember={currentMember}
-            members={ctx.members}
-            cars={ctx.cars}
-            carPassengers={ctx.carPassengers}
-            carExpenses={ctx.carExpenses}
-            generalExpenses={ctx.generalExpenses}
-            generalExpenseParticipants={ctx.generalExpenseParticipants}
-          />
+          <div className="space-y-3">
+            <PaymentsSummaryCard
+              summary={computePayments({
+                members: ctx.members,
+                cars: ctx.cars,
+                carPassengers: ctx.carPassengers,
+                carExpenses: ctx.carExpenses,
+                generalExpenses: ctx.generalExpenses,
+                generalExpenseParticipants: ctx.generalExpenseParticipants,
+              })}
+              currentMemberId={currentMember.id}
+              dataIncomplete={dataIncomplete}
+            />
+            <SpeseTab
+              roomId={room.id}
+              currentMember={currentMember}
+              members={ctx.members}
+              cars={ctx.cars}
+              carPassengers={ctx.carPassengers}
+              carExpenses={ctx.carExpenses}
+              generalExpenses={ctx.generalExpenses}
+              generalExpenseParticipants={ctx.generalExpenseParticipants}
+            />
+          </div>
         )}
       </section>
 

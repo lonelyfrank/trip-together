@@ -4,8 +4,6 @@ import Button from '../ui/Button'
 import BottomSheet from '../ui/BottomSheet'
 import TextField from '../ui/TextField'
 import { formatMoney } from '../../lib/format'
-import Card from '../ui/Card'
-import Chip from '../ui/Chip'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { computeBalances, computeTransfers } from '../../lib/balances'
 import { mutateNotify } from '../../lib/db'
@@ -53,10 +51,6 @@ export default function SpeseTab({
   const balances = computeBalances({ cars, carPassengers, carExpenses, generalExpenses, generalExpenseParticipants })
   const transfers = computeTransfers(balances)
   const hasOpenBalance = transfers.length > 0
-  const myBalance = balances.find((balance) => balance.memberId === currentMember.id)?.net ?? 0
-
-  const carTotal = carExpenses.reduce((s, e) => s + e.amount, 0)
-  const generalTotal = generalExpenses.filter((e) => !e.waived).reduce((s, e) => s + e.amount, 0)
 
   function toggleParticipant(id: string) {
     setParticipantIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]))
@@ -114,22 +108,7 @@ export default function SpeseTab({
   }
 
   return (
-    <div className="space-y-3 px-4 pb-28 sm:px-6">
-      <Card tone="highlight" className="!p-5">
-        <p className="text-xs font-medium uppercase tracking-widest text-muted">Il tuo saldo</p>
-        <p className="mt-3 font-serif text-3xl">{formatMoney(Math.abs(myBalance))}</p>
-        <p className="mt-2 text-sm text-muted">{myBalance > 0 ? 'Da ricevere dal gruppo' : myBalance < 0 ? 'Da restituire al gruppo' : 'Non risultano saldi aperti a tuo nome'}</p>
-      </Card>
-      <Card className="flex items-center justify-between">
-        <div>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Totale evento</p>
-          <p className="mt-1 font-serif text-[28px] leading-none text-cream">
-            {formatMoney(carTotal + generalTotal)}
-          </p>
-        </div>
-        {hasOpenBalance && <Chip tone="alert">{transfers.length} saldi aperti</Chip>}
-      </Card>
-
+    <div className="space-y-3">
       {cars.length > 0 && (
         <div>
           <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Per auto</p>

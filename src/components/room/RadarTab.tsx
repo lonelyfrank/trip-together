@@ -92,7 +92,7 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
   const memberById = (id: string) => members.find((m) => m.id === id)
 
   return (
-    <div className="flex flex-col items-center px-4 pb-28 sm:px-6">
+    <div className="flex flex-col items-center">
       <div className="mb-4 flex w-full items-center justify-between">
         <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
           {active ? 'Radar attivo' : 'Radar in pausa'}
