@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { computeBalances, computeTransfers } from './balances.ts'
-import type { Car, GeneralExpense } from '../types'
+import type { Car, ExpenseSettlement, GeneralExpense } from '../types'
 
 const created_at = '2026-07-15T10:00:00Z'
 const expense: GeneralExpense = {
@@ -15,7 +15,7 @@ test('saldi: un partecipante duplicato paga una sola quota', () => {
       { id: '1', expense_id: 'e', member_id: 'a' },
       { id: '2', expense_id: 'e', member_id: 'b' },
       { id: '3', expense_id: 'e', member_id: 'b' },
-    ],
+    ], settlements: [],
   })
   assert.deepEqual(balances, [{ memberId: 'a', net: 30 }, { memberId: 'b', net: -30 }])
   assert.deepEqual(computeTransfers(balances), [{ fromMemberId: 'b', toMemberId: 'a', amount: 30 }])
@@ -27,6 +27,26 @@ test('saldi auto: il conducente anche passeggero è contato una sola volta', () 
   const balances = computeBalances({ cars: [car], carPassengers: [
     { id: '1', car_id: 'c', member_id: 'a' }, { id: '2', car_id: 'c', member_id: 'b' },
   ], carExpenses: [{ id: 'e', car_id: 'c', label: 'Benzina', amount: 40, paid_by_member_id: 'a', created_at }],
-  generalExpenses: [], generalExpenseParticipants: [] })
+  generalExpenses: [], generalExpenseParticipants: [], settlements: [] })
   assert.deepEqual(balances, [{ memberId: 'a', net: 20 }, { memberId: 'b', net: -20 }])
+})
+
+test('saldi: un rimborso registrato chiude il debito invece di ripeterlo', () => {
+  const settlement: ExpenseSettlement = {
+    id: 's', room_id: 'r', from_member_id: 'b', to_member_id: 'a', amount: 30,
+    note: null, recorded_by: 'a', settled_at: created_at, created_at,
+  }
+  const input = {
+    cars: [], carPassengers: [], carExpenses: [],
+    generalExpenses: [expense], generalExpenseParticipants: [
+      { id: '1', expense_id: 'e', member_id: 'a' },
+      { id: '2', expense_id: 'e', member_id: 'b' },
+    ],
+  }
+
+  assert.deepEqual(computeBalances({ ...input, settlements: [settlement] }), [])
+  // Il rimborso non tocca le spese: solo il saldo si azzera.
+  assert.deepEqual(computeTransfers(computeBalances({ ...input, settlements: [settlement] })), [])
+  assert.deepEqual(computeBalances({ ...input, settlements: [{ ...settlement, amount: 10 }] }),
+    [{ memberId: 'a', net: 20 }, { memberId: 'b', net: -20 }])
 })

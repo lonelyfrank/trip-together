@@ -13,7 +13,16 @@ import {
   closeRoom,
   deleteRadarPositionsByRoom,
 } from '../../lib/mutations'
-import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member, Room } from '../../types'
+import type {
+  Car,
+  CarExpense,
+  CarPassenger,
+  ExpenseSettlement,
+  GeneralExpense,
+  GeneralExpenseParticipant,
+  Member,
+  Room,
+} from '../../types'
 
 interface CloseRoomSectionProps {
   room: Room
@@ -23,6 +32,7 @@ interface CloseRoomSectionProps {
   carExpenses: CarExpense[]
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
+  settlements: ExpenseSettlement[]
   onGoToSpese: () => void
   onClosed: () => void
 }
@@ -35,6 +45,7 @@ export default function CloseRoomSection({
   carExpenses,
   generalExpenses,
   generalExpenseParticipants,
+  settlements,
   onGoToSpese,
   onClosed,
 }: CloseRoomSectionProps) {
@@ -46,7 +57,7 @@ export default function CloseRoomSection({
 
   if (currentMember.role !== 'creator' || room.status === 'closed') return null
 
-  const balances = computeBalances({ cars, carPassengers, carExpenses, generalExpenses, generalExpenseParticipants })
+  const balances = computeBalances({ cars, carPassengers, carExpenses, generalExpenses, generalExpenseParticipants, settlements })
   const transfers = computeTransfers(balances)
   const hasOpenBalance = transfers.length > 0
 

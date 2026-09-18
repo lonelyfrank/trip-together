@@ -204,3 +204,42 @@ export interface ActivityParticipant {
   room_id: string
   created_at: string
 }
+
+export interface RoomPoll {
+  id: string
+  room_id: string
+  question: string
+  /** Null = aperto finché qualcuno non lo chiude. Nessuno status persistito. */
+  closes_at: string | null
+  created_by: string
+  created_at: string
+}
+
+export interface RoomPollOption {
+  id: string
+  poll_id: string
+  room_id: string
+  label: string
+  created_at: string
+}
+
+export interface RoomPollVote {
+  poll_id: string
+  option_id: string
+  member_id: string
+  room_id: string
+  voted_at: string
+}
+
+/** Rimborso avvenuto fuori dall'app, registrato per chiudere un saldo. */
+export interface ExpenseSettlement {
+  id: string
+  room_id: string
+  from_member_id: string
+  to_member_id: string
+  amount: number
+  note: string | null
+  recorded_by: string
+  settled_at: string
+  created_at: string
+}

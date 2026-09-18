@@ -6,7 +6,16 @@ import { formatMoney } from '../../lib/format'
 import { confirmMemberPresence } from '../../lib/mutations'
 import { roomPhase } from '../../lib/phase'
 import { showToast } from '../../lib/toast'
-import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member, Room } from '../../types'
+import type {
+  Car,
+  CarExpense,
+  CarPassenger,
+  ExpenseSettlement,
+  GeneralExpense,
+  GeneralExpenseParticipant,
+  Member,
+  Room,
+} from '../../types'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 
@@ -19,6 +28,7 @@ interface Props {
   carExpenses: CarExpense[]
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
+  settlements: ExpenseSettlement[]
   dataIncomplete: boolean
   onGoToAuto: () => void
   onGoToSpese: () => void

@@ -334,3 +334,83 @@ export const leaveActivity = op('activity_participants.leave', (activityId: stri
     .eq('activity_id', activityId)
     .eq('member_id', memberId),
 )
+
+// ─── Sondaggi ─────────────────────────────────────────────────────────────
+// Sondaggio e opzioni sono Op separate con id generati dal client: se la rete
+// cade a metà, la coda offline riesegue solo quelle rimaste, senza dipendere
+// da un id restituito dal server.
+
+export const insertPoll = op(
+  'room_polls.insert',
+  (id: string, roomId: string, createdBy: string, question: string, closesAt: string | null) =>
+    supabase.from('room_polls').insert({
+      id,
+      room_id: roomId,
+      created_by: createdBy,
+      question: question.trim(),
+      closes_at: closesAt,
+    }),
+)
+
+export const insertPollOption = op(
+  'room_poll_options.insert',
+  (id: string, pollId: string, label: string) =>
+    supabase.from('room_poll_options').insert({ id, poll_id: pollId, label: label.trim() }),
+)
+
+// Un voto a testa: l'upsert sulla chiave (poll_id, member_id) rende il
+// cambio di idea un aggiornamento, non una seconda riga.
+export const castPollVote = op(
+  'room_poll_votes.cast',
+  (pollId: string, memberId: string, optionId: string) =>
+    supabase
+      .from('room_poll_votes')
+      .upsert(
+        { poll_id: pollId, member_id: memberId, option_id: optionId, voted_at: new Date().toISOString() },
+        { onConflict: 'poll_id,member_id' },
+      ),
+)
+
+export const retractPollVote = op('room_poll_votes.retract', (pollId: string, memberId: string) =>
+  supabase.from('room_poll_votes').delete().eq('poll_id', pollId).eq('member_id', memberId),
+)
+
+// Chiudere è scrivere la scadenza a adesso: nessuno status separato che possa
+// contraddire la data.
+export const closePoll = op('room_polls.close', (pollId: string, closesAt: string) =>
+  supabase.from('room_polls').update({ closes_at: closesAt }).eq('id', pollId),
+)
+
+export const deletePoll = op('room_polls.delete', (pollId: string) =>
+  supabase.from('room_polls').delete().eq('id', pollId),
+)
+
+// ─── Rimborsi ─────────────────────────────────────────────────────────────
+// `room_id` non si invia: lo deriva il server dai due membri, che devono
+// appartenere allo stesso evento.
+
+export const insertSettlement = op(
+  'expense_settlements.insert',
+  (
+    id: string,
+    fromMemberId: string,
+    toMemberId: string,
+    amount: number,
+    note: string | null,
+    recordedBy: string,
+  ) =>
+    supabase.from('expense_settlements').insert({
+      id,
+      from_member_id: fromMemberId,
+      to_member_id: toMemberId,
+      amount,
+      note: note?.trim() || null,
+      recorded_by: recordedBy,
+    }),
+)
+
+// Un rimborso registrato per sbaglio si cancella: la tabella non è
+// aggiornabile, perché una riga qui è un fatto avvenuto.
+export const deleteSettlement = op('expense_settlements.delete', (settlementId: string) =>
+  supabase.from('expense_settlements').delete().eq('id', settlementId),
+)

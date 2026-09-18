@@ -1,4 +1,4 @@
-import type { CarExpense, CarPassenger, Car, GeneralExpense, GeneralExpenseParticipant } from '../types'
+import type { Car, CarExpense, CarPassenger, ExpenseSettlement, GeneralExpense, GeneralExpenseParticipant } from '../types'
 
 export interface Balance {
   memberId: string
@@ -19,6 +19,9 @@ interface ComputeBalancesInput {
   carExpenses: CarExpense[]
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
+  /** Rimborsi già avvenuti fuori dall'app. Obbligatorio: un saldo che li
+   *  ignora chiede una seconda volta soldi già restituiti. */
+  settlements: ExpenseSettlement[]
 }
 
 export function computeBalances({
@@ -27,6 +30,7 @@ export function computeBalances({
   carExpenses,
   generalExpenses,
   generalExpenseParticipants,
+  settlements,
 }: ComputeBalancesInput): Balance[] {
   const net = new Map<string, number>()
   const add = (memberId: string, amount: number) => net.set(memberId, (net.get(memberId) ?? 0) + amount)
@@ -53,6 +57,14 @@ export function computeBalances({
     const share = expense.amount / participantIds.length
     for (const id of participantIds) add(id, -share)
     if (expense.paid_by_member_id) add(expense.paid_by_member_id, expense.amount)
+  }
+
+  // Un rimborso sposta il saldo come una spesa pagata: chi ha dato i soldi
+  // risale, chi li ha ricevuti scende. Le spese restano intatte: il rimborso
+  // è un fatto a parte, non la correzione di una spesa già registrata.
+  for (const settlement of settlements) {
+    add(settlement.from_member_id, settlement.amount)
+    add(settlement.to_member_id, -settlement.amount)
   }
 
   return Array.from(net.entries())

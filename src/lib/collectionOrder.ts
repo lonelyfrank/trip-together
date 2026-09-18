@@ -13,6 +13,11 @@ export const COLLECTION_ORDER: Record<string, readonly string[]> = {
   // finiscono in fondo (nullsFirst: false in roomList).
   activities: ['starts_at', 'created_at', 'id'],
   activity_participants: ['activity_id', 'member_id'],
+  room_polls: ['created_at', 'id'], room_poll_options: ['created_at', 'id'],
+  room_poll_votes: ['poll_id', 'member_id'],
+  // I rimborsi si leggono dal più recente in giù nell'interfaccia, ma
+  // l'ordine di base resta crescente come per tutte le altre collezioni.
+  expense_settlements: ['settled_at', 'id'],
 }
 
 function timestampMicros(value: string): number {

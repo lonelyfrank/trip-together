@@ -21,6 +21,18 @@ I tre blocchi del piano tecnico, già confermati applicati dall'utente, sono:
 2. `Fix: ordine cronologico e quote spesa univoche`.
 3. `Fix: riferimenti obbligatori, capienza auto e soste client-only`.
 
+Poi `Feature: attività (itinerario dell'evento)`, anch'esso applicato.
+
+**Da applicare**, in questo ordine (l'ultimo referenzia le tabelle dei primi due):
+
+1. `Feature: sondaggi di gruppo`.
+2. `Feature: rimborsi registrati`.
+3. `Fix: l'autore dichiarato deve essere chi scrive`.
+
+Finché non sono applicati, la sezione Gruppo mostra l'errore di sezione al posto
+di sondaggi e rimborsi: le tabelle non esistono e le query falliscono, che è il
+comportamento voluto (una tabella mancante non è una lista vuota).
+
 Sono scritti con guardie e definizioni ripetibili. La rieseguibilità è stata
 revisionata staticamente, **non verificata con una seconda esecuzione DDL**.
 Il blocco dei riferimenti interrompe la transazione quando i dati preesistenti

@@ -175,8 +175,8 @@ Itinerario giorno per giorno, su `activities` + `activity_participants`.
 
 ### Gruppo (`pages/room/Group.tsx`)
 Membri (`MembersSection`), spese (`SpeseTab`), compiti e messaggi
-(`BachecaTab`), posizione (`RadarTab`), impostazioni evento
-(`CloseRoomSection`).
+(`BachecaTab`), sondaggi (`PollsSection`), posizione (`RadarTab`), impostazioni
+evento (`CloseRoomSection`).
 
 #### Bacheca (`BachecaTab`)
 Note brevi (con "fissa in alto"), link utili con etichetta, e **`ChecklistSection`**:
@@ -191,10 +191,30 @@ al creatore.
 - **`src/lib/balances.ts`** calcola i saldi netti e li compensa in un numero
   minimo di trasferimenti (`computeTransfers`). Partecipanti deduplicati, quote
   arrotondate al centesimo, tolleranza 1 centesimo.
+- **Rimborsi registrati** (`expense_settlements`): il rimborso avviene fuori
+  dall'app (contanti, bonifico), qui se ne registra il fatto. Ogni trasferimento
+  suggerito ha il suo "segna come rimborsato" con l'importo già compilato, anche
+  parziale. Entra nei saldi, **non** nel totale speso: restituire dei soldi non
+  rende il viaggio più caro. Una riga è un fatto avvenuto, quindi non è
+  modificabile: si annulla e si riscrive (e può farlo chi l'ha registrata o il
+  creatore).
 - **Condono** di una spesa (`waived`) invece della cancellazione: resta la traccia.
 - Se un dato economico manca (spesa senza pagante, senza partecipanti, o riferita a
   un'auto assente) l'app **lo dichiara** invece di mostrare un saldo plausibile ma
   falso, e blocca l'archiviazione.
+
+#### Sondaggi (`PollsSection`)
+Una domanda con due o più risposte, votata dal gruppo: la decisione che in chat
+diventa venti messaggi e nessuna conclusione. Non è una chat travestita — la
+domanda è un campo corto, le risposte sono un elenco chiuso.
+- Un voto a testa (PK `(poll_id, member_id)`): cambiare idea è un UPDATE,
+  ritoccare la propria opzione ritira il voto.
+- **Nessuno `status` persistito**, come per le soste: è aperto finché `closes_at`
+  è nullo o futuro, e chiuderlo significa scrivere quella data. Le percentuali
+  sono sui voti espressi, l'opzione in testa è evidenziata (in parità, tutte).
+- Chiudere ed eliminare sono riservati a chi l'ha creato o al creatore
+  dell'evento. Non si può vedere chi ha votato cosa: il conteggio serve a
+  decidere, il resto a discuterne dopo.
 
 #### Radar (`RadarTab`)
 Posizione condivisa **solo su attivazione esplicita**, rappresentata come radar
@@ -229,10 +249,10 @@ mancante non è una lista vuota, e un errore non diventa mai un saldo a zero. Gl
 helper `rows()`, `single()` e `firstError()` collassano il risultato dove è
 innocuo. Nessun errore è silenzioso: log con etichetta `tabella.operazione`.
 
-`src/hooks/useRoomData.ts` è il cuore: 16 query in parallelo per una stanza,
+`src/hooks/useRoomData.ts` è il cuore: 22 query in parallelo per una stanza,
 esposte in un `RoomPayload` unico. Gli errori delle singole funzionalità finiscono
-in `sectionErrors` (auto / spese / bacheca / radar) e degradano solo la loro
-sezione. Analoghi: `useCrewData`, `useMyRooms`, `useMyCrews`.
+in `sectionErrors` (auto / spese / bacheca / radar / attivita / sondaggi) e
+degradano solo la loro sezione. Analoghi: `useCrewData`, `useMyRooms`, `useMyCrews`.
 
 **Ordinamento** — ogni query-lista ha un `.order()` esplicito, e
 `src/lib/collectionOrder.ts` applica **le stesse colonne** alle patch realtime:
@@ -319,6 +339,16 @@ prodotto.
 Gli helper interni (`tt_require_session`, `tt_display_name`, `tt_invite_code`,
 `tt_create_group`) e le funzioni dei trigger non sono eseguibili dal client.
 
+**Autore di una riga:** le colonne d'autore scritte dal browser
+(`activities.created_by`, `stop_proposals.proposed_by`,
+`room_checklist_items.created_by`, `room_polls.created_by`,
+`expense_settlements.recorded_by`) passano da un unico trigger
+(`tt_author_is_caller`): all'INSERT l'autore dev'essere chi scrive, all'UPDATE
+non può cambiare. Prima un membro poteva firmare una riga col nome di un altro
+membro della stessa stanza: le policy verificano l'appartenenza, non l'identità.
+La collaborazione resta intatta — chiunque può confermare la tappa proposta da un
+altro o assegnarsi un compito scritto da un altro.
+
 **Codice invito:** 7 caratteri su alfabeto di 32 senza caratteri confondibili
 (`ABCDEFGHJKLMNPQRSTUVWXYZ23456789`), generato con `crypto.getRandomValues` sul
 client e `gen_random_uuid()` in SQL, con maschera e rejection sampling. Unicità
@@ -370,6 +400,10 @@ Attenzione ai nomi reali: non `room`, `room_members`, `car_members`, `expenses`.
 - `radar_positions`: `member_id (pk), room_id ᴺᴺ, lat, lng, updated_at`
 - `activities`: `id, room_id ᴺᴺ, title, starts_at (null=da programmare), duration_minutes, category ('mare'|'cibo'|'cultura'|'drink'|'panorama'|'altro'), place_label, lat, lng, status ('proposta'|'confermata'|'prenotata'|'annullata'), price_per_person, note, created_by ᴺᴺ, created_at` — check su lunghezza titolo, prezzo non negativo, range coordinate e `(lat is null) = (lng is null)`
 - `activity_participants`: `activity_id, member_id (pk composita), room_id, created_at` — la PK composita rende impossibile il doppio inserimento per costruzione, non per rimedio successivo
+- `room_polls`: `id, room_id ᴺᴺ, question, closes_at (null=aperto a oltranza), created_by ᴺᴺ, created_at` — **nessuna colonna `status`**: l'esito è derivato da voti e scadenza
+- `room_poll_options`: `id, poll_id ᴺᴺ, room_id ᴺᴺ, label, created_at` — unique `(poll_id, label)`
+- `room_poll_votes`: `poll_id, member_id (pk composita), option_id, room_id, voted_at` — FK composita `(option_id, poll_id)`: non si vota l'opzione di un altro sondaggio
+- `expense_settlements`: `id, room_id ᴺᴺ, from_member_id ᴺᴺ, to_member_id ᴺᴺ, amount (check > 0), note, recorded_by ᴺᴺ, settled_at, created_at` — **non aggiornabile** (nessun grant di UPDATE): una riga è un fatto avvenuto; `room_id` è derivato dai due membri, che devono appartenere allo stesso evento
 
 ᴺᴺ = `not null` aggiunto dal blocco di fix, con backfill solo da riferimenti
 univoci e interruzione transazionale in caso di ambiguità (nessuna riga
@@ -491,20 +525,29 @@ d'uscita — l'app si usa in mobilità, dove "torna indietro" spesso non basta.
    (`Avatar`/`AvatarGroup`, `AlertBanner`, `EmptyState`, `SectionHeader`),
    `Profile`, `TripHeader` + `TripSwitcher`. `Room.tsx`, `TabBar` e `StanzaTab`
    sono stati sostituiti; nessuna funzionalità rimossa.
-   **Ancora da fare:** composizione delle viste secondo i mockup (card Adesso,
-   route card Viaggio, layout Gruppo), migrazione dei file che usano ancora gli
-   alias legacy, e le attività (§ sotto).
+   Composizione delle viste secondo i mockup e migrazione dei token completate
+   nei commit successivi (`2e5008d`, `92a3a3a`, `2538ce0`); l'itinerario delle
+   attività in `1bacf49`.
 
-**Stato delle verifiche:** `npm run check`, `npm test` (58 test) e `npm run build`
+5. **Sondaggi e rimborsi registrati** (in corso) — gli ultimi due modelli
+   persistenti previsti dal piano: `room_polls` + opzioni + voti, e
+   `expense_settlements`. Con loro è stato chiuso anche il buco delle colonne
+   d'autore scrivibili dal client, su tutte e cinque le tabelle insieme (§6).
+   **Da applicare a mano sul database**: i tre blocchi in fondo alla migration
+   (`Feature: sondaggi di gruppo`, `Feature: rimborsi registrati`,
+   `Fix: l'autore dichiarato deve essere chi scrive`).
+
+**Stato delle verifiche:** `npm run check`, `npm test` (80 test) e `npm run build`
 passano. Smoke UI e PWA in CI sulle pull request. `scripts/verifyMembership.mjs`
 prova i flussi reali contro il DB in sola DML, creando e ripulendo dati di prova.
 
 **Limiti noti e lavoro non ancora fatto**
 1. **Archivio** vincolato solo dall'interfaccia: manca il vincolo server che
    impedisca le scritture su una stanza `closed`.
-2. **Spese**: rimborsi non registrabili, ripartizione dei resti in centesimi non
-   implementata, idempotenza completa del salvataggio in due passi ancora da
-   fare lato server.
+2. **Spese**: ripartizione dei resti in centesimi non implementata, idempotenza
+   completa del salvataggio in due passi ancora da fare lato server. I rimborsi
+   ora si registrano (`expense_settlements`), ma nessun vincolo server impedisce
+   di registrarne uno più grande del debito: il saldo si limita a invertirsi.
 3. **Coda offline**: nessun coordinamento fra più tab aperte; la cache non
    sopravvive alla riapertura dell'app senza rete.
 4. **Radar**: nessuna garanzia di funzionamento in background (limite delle API
@@ -516,16 +559,16 @@ prova i flussi reali contro il DB in sola DML, creando e ripulendo dati di prova
    reale non è stata provata, per il divieto di eseguire DDL.
 7. `docs/AUDIT.md` è una fotografia storica del 3 agosto 2026 e **non** riflette
    il codice attuale; contiene ancora il project ref Supabase in chiaro.
-8. **Attività:** implementate (4° blocco SQL, applicato). Resta scoperto:
-   `duration_minutes` e `note` sono nello schema ma non ancora modificabili
-   dall'interfaccia, e `created_by` è scrivibile dal client — la stessa
-   esposizione di `stop_proposals.proposed_by` e `room_checklist_items.created_by`,
-   da chiudere su tutte e tre insieme con un trigger, non su una sola.
+8. **Attività:** implementate (4° blocco SQL, applicato). `duration_minutes` e
+   `note` sono nello schema ma non ancora modificabili dall'interfaccia. La
+   scrittura libera delle colonne d'autore è chiusa dal trigger
+   `tt_author_is_caller` (§6), ma quel blocco **non è ancora stato applicato**.
 9. **Senza sorgente dati** e quindi non implementati, per non mostrare dati
    finti: mappa del percorso e mini-map (nessun provider cartografico nel
    progetto), km/durata/ETA, traffico, stima carburante e pedaggi, bagagli,
    contatti di emergenza, avatar fotografici, cover del viaggio, badge
-   notifiche, "sollecita pagamento".
+   notifiche, "sollecita pagamento" (nessun canale di notifica: un pulsante che
+   non fa arrivare niente a nessuno è peggio della sua assenza).
 10. **Smoke UI non eseguibile in locale:** Playwright è una dipendenza effimera
    (`npx`) e la sandbox non ha rete. I selettori sono stati riallineati alla
    nuova navigazione ma vanno validati in CI.

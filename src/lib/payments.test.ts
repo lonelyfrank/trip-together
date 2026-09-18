@@ -15,6 +15,7 @@ const base = {
   carExpenses: [],
   generalExpenses: [],
   generalExpenseParticipants: [],
+  settlements: [],
 } as never
 
 function spesa(id: string, amount: number, paidBy: string) {
@@ -92,4 +93,29 @@ test('pagamenti: senza membri non si divide per zero', () => {
   const summary = computePayments({ ...(base as object), members: [] } as never)
   assert.equal(summary.perPerson, 0)
   assert.deepEqual(summary.rows, [])
+})
+
+test('pagamenti: un rimborso registrato sposta il saldo, non il totale speso', () => {
+  const rimborso = {
+    id: 's1', room_id: 'r1', from_member_id: 'm2', to_member_id: 'm1', amount: 30,
+    note: null, recorded_by: 'm1', settled_at: '2026-09-18T12:00:00.000Z',
+    created_at: '2026-09-18T12:00:00.000Z',
+  }
+  const summary = computePayments({
+    ...(base as object),
+    generalExpenses: [spesa('e1', 90, 'm1')],
+    generalExpenseParticipants: quote('e1', ['m1', 'm2', 'm3']),
+    settlements: [rimborso],
+  } as never)
+
+  // Restituire dei soldi non rende il viaggio più caro.
+  assert.equal(summary.total, 90)
+  assert.equal(summary.perPerson, 30)
+
+  const marco = summary.rows.find((r) => r.memberId === 'm2')!
+  assert.equal(marco.net, 0)
+  assert.equal(marco.settled, true)
+  // Resta aperto solo il debito di Matteo.
+  assert.equal(summary.outstanding, 30)
+  assert.equal(summary.rows.find((r) => r.memberId === 'm1')!.paid, 90, 'il rimborso non è un anticipo')
 })

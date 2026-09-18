@@ -15,6 +15,7 @@ import type {
   CarExpense,
   CarPassenger,
   DelayReport,
+  ExpenseSettlement,
   GeneralExpense,
   GeneralExpenseParticipant,
   Member,
@@ -22,13 +23,16 @@ import type {
   RideRequest,
   Room,
   RoomChecklistItem,
+  RoomPoll,
+  RoomPollOption,
+  RoomPollVote,
   StopProposal,
   StopProposalVote,
 } from '../types'
 
 export interface RoomPayload {
   error: PostgrestError | null
-  sectionErrors: Partial<Record<'auto' | 'spese' | 'bacheca' | 'radar' | 'attivita', PostgrestError | null>>
+  sectionErrors: Partial<Record<'auto' | 'spese' | 'bacheca' | 'radar' | 'attivita' | 'sondaggi', PostgrestError | null>>
   room: Room | null
   members: Member[]
   cars: Car[]
@@ -47,6 +51,10 @@ export interface RoomPayload {
   rideRequests: RideRequest[]
   activities: Activity[]
   activityParticipants: ActivityParticipant[]
+  polls: RoomPoll[]
+  pollOptions: RoomPollOption[]
+  pollVotes: RoomPollVote[]
+  settlements: ExpenseSettlement[]
 }
 
 const EMPTY_PAYLOAD: RoomPayload = {
@@ -70,6 +78,10 @@ const EMPTY_PAYLOAD: RoomPayload = {
   rideRequests: [],
   activities: [],
   activityParticipants: [],
+  polls: [],
+  pollOptions: [],
+  pollVotes: [],
+  settlements: [],
 }
 
 export const roomDataKey = (roomId: string) => ['room-data', roomId] as const
@@ -96,6 +108,10 @@ const TABLES: { table: string; key: CollectionKey; pk: string[] }[] = [
   { table: 'ride_requests', key: 'rideRequests', pk: ['id'] },
   { table: 'activities', key: 'activities', pk: ['id'] },
   { table: 'activity_participants', key: 'activityParticipants', pk: ['activity_id', 'member_id'] },
+  { table: 'room_polls', key: 'polls', pk: ['id'] },
+  { table: 'room_poll_options', key: 'pollOptions', pk: ['id'] },
+  { table: 'room_poll_votes', key: 'pollVotes', pk: ['poll_id', 'member_id'] },
+  { table: 'expense_settlements', key: 'settlements', pk: ['id'] },
 ]
 const BY_TABLE = new Map(TABLES.map((t) => [t.table, t]))
 
@@ -126,6 +142,10 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     rideRequestsQ,
     activitiesQ,
     activityParticipantsQ,
+    pollsQ,
+    pollOptionsQ,
+    pollVotesQ,
+    settlementsQ,
   ] = await Promise.all([
     query<Room>('rooms.byId', supabase.from('rooms').select('*').eq('id', id).maybeSingle()),
     query<Member[]>('members.byRoom', roomList('members', id)),
@@ -157,6 +177,10 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
       'activity_participants.byRoom',
       roomList('activity_participants', id),
     ),
+    query<RoomPoll[]>('room_polls.byRoom', roomList('room_polls', id)),
+    query<RoomPollOption[]>('room_poll_options.byRoom', roomList('room_poll_options', id)),
+    query<RoomPollVote[]>('room_poll_votes.byRoom', roomList('room_poll_votes', id)),
+    query<ExpenseSettlement[]>('expense_settlements.byRoom', roomList('expense_settlements', id)),
   ])
 
   return {
@@ -165,10 +189,11 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     error: firstError(roomQ, membersQ, carsQ),
     sectionErrors: {
       auto: firstError(carPassengersQ, carCargoQ, carExpensesQ, delayReportsQ, stopProposalsQ, stopProposalVotesQ, rideRequestsQ),
-      spese: firstError(carPassengersQ, carExpensesQ, generalExpensesQ, generalExpenseParticipantsQ),
+      spese: firstError(carPassengersQ, carExpensesQ, generalExpensesQ, generalExpenseParticipantsQ, settlementsQ),
       bacheca: firstError(boardNotesQ, boardLinksQ, roomChecklistQ),
       radar: firstError(radarQ),
       attivita: firstError(activitiesQ, activityParticipantsQ),
+      sondaggi: firstError(pollsQ, pollOptionsQ, pollVotesQ),
     },
     room: single(roomQ),
     members: rows(membersQ),
@@ -188,6 +213,10 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     rideRequests: rows(rideRequestsQ),
     activities: rows(activitiesQ),
     activityParticipants: rows(activityParticipantsQ),
+    polls: rows(pollsQ),
+    pollOptions: rows(pollOptionsQ),
+    pollVotes: rows(pollVotesQ),
+    settlements: rows(settlementsQ),
   }
 }
 

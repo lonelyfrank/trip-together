@@ -6,6 +6,7 @@ import BachecaTab from '../../components/room/BachecaTab'
 import PaymentsSummaryCard from '../../components/room/PaymentsSummaryCard'
 import CloseRoomSection from '../../components/room/CloseRoomSection'
 import MembersSection from '../../components/room/MembersSection'
+import PollsSection from '../../components/room/PollsSection'
 import RadarTab from '../../components/room/RadarTab'
 import SpeseTab from '../../components/room/SpeseTab'
 import { useRoomContext } from '../../hooks/useRoomContext'
@@ -57,6 +58,7 @@ export default function Group() {
                 carExpenses: ctx.carExpenses,
                 generalExpenses: ctx.generalExpenses,
                 generalExpenseParticipants: ctx.generalExpenseParticipants,
+                settlements: ctx.settlements,
               })}
               currentMemberId={currentMember.id}
               dataIncomplete={dataIncomplete}
@@ -70,6 +72,7 @@ export default function Group() {
               carExpenses={ctx.carExpenses}
               generalExpenses={ctx.generalExpenses}
               generalExpenseParticipants={ctx.generalExpenseParticipants}
+              settlements={ctx.settlements}
             />
           </div>
         )}
@@ -87,6 +90,21 @@ export default function Group() {
             boardNotes={ctx.boardNotes}
             boardLinks={ctx.boardLinks}
             roomChecklistItems={ctx.roomChecklistItems}
+          />
+        )}
+      </section>
+
+      <section aria-label="Sondaggi del gruppo">
+        {sectionErrors.sondaggi ? (
+          sectionError
+        ) : (
+          <PollsSection
+            roomId={room.id}
+            currentMember={currentMember}
+            memberCount={ctx.members.length}
+            polls={ctx.polls}
+            pollOptions={ctx.pollOptions}
+            pollVotes={ctx.pollVotes}
           />
         )}
       </section>
@@ -116,6 +134,7 @@ export default function Group() {
             carExpenses={ctx.carExpenses}
             generalExpenses={ctx.generalExpenses}
             generalExpenseParticipants={ctx.generalExpenseParticipants}
+            settlements={ctx.settlements}
             onGoToSpese={() => goTo('gruppo')}
             onClosed={() => navigate('/')}
           />

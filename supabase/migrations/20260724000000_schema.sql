@@ -989,3 +989,268 @@ grant update (title, starts_at, duration_minutes, category, place_label, lat, ln
 
 notify pgrst, 'reload schema';
 commit;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Feature: sondaggi di gruppo.
+--
+-- Le proposte di sosta (`stop_proposals`) sono una domanda sì/no che scade
+-- in pochi minuti mentre si viaggia. Un sondaggio è l'altra metà: più
+-- opzioni, nessuna urgenza, e serve a decidere *prima* — dove si cena,
+-- quale spiaggia, a che ora si parte. Restano due tabelle distinte perché
+-- hanno vincoli diversi: la sosta ha una scadenza obbligatoria e un'auto,
+-- il sondaggio no.
+--
+-- Non è una chat travestita: la domanda è un campo corto e tipizzato, le
+-- risposte sono un elenco chiuso di opzioni. Nessun campo libero di
+-- risposta, coerentemente con il vincolo fondativo del prodotto.
+--
+-- Come per le soste, nessuno `status` persistito: un sondaggio è aperto
+-- finché `closes_at` è nullo o futuro. Chiuderlo significa scrivere
+-- `closes_at = now()`, non aggiornare un secondo campo che può divergere.
+--
+-- La chiave primaria di `room_poll_votes` è (poll_id, member_id): un voto a
+-- testa per costruzione, cambiare idea è un UPDATE di `option_id`. La
+-- chiave esterna composita (option_id, poll_id) impedisce di votare
+-- un'opzione che appartiene a un altro sondaggio — un vincolo che il
+-- browser non può garantire.
+-- ═══════════════════════════════════════════════════════════════════════
+begin;
+
+create table if not exists public.room_polls (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  question text not null,
+  -- Null = resta aperto finché qualcuno non lo chiude.
+  closes_at timestamptz,
+  created_by uuid not null references public.members(id),
+  created_at timestamptz not null default now(),
+  constraint room_polls_question_length check (char_length(btrim(question)) between 1 and 120)
+);
+
+create table if not exists public.room_poll_options (
+  id uuid primary key default gen_random_uuid(),
+  poll_id uuid not null references public.room_polls(id) on delete cascade,
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  label text not null,
+  created_at timestamptz not null default now(),
+  constraint room_poll_options_label_length check (char_length(btrim(label)) between 1 and 80),
+  -- Due opzioni identiche nello stesso sondaggio sono un errore di battitura,
+  -- non una scelta: il voto si spaccherebbe fra due righe indistinguibili.
+  constraint room_poll_options_unique_label unique (poll_id, label),
+  -- Bersaglio della chiave esterna composita dei voti.
+  constraint room_poll_options_id_poll unique (id, poll_id)
+);
+
+create table if not exists public.room_poll_votes (
+  poll_id uuid not null references public.room_polls(id) on delete cascade,
+  option_id uuid not null,
+  member_id uuid not null references public.members(id) on delete cascade,
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  voted_at timestamptz not null default now(),
+  primary key (poll_id, member_id),
+  constraint room_poll_votes_option_of_poll
+    foreign key (option_id, poll_id) references public.room_poll_options(id, poll_id) on delete cascade
+);
+
+create index if not exists idx_room_polls_room on public.room_polls(room_id, created_at, id);
+create index if not exists idx_room_poll_options_room on public.room_poll_options(room_id, poll_id);
+create index if not exists idx_room_poll_votes_room on public.room_poll_votes(room_id);
+create index if not exists idx_room_poll_votes_option on public.room_poll_votes(option_id);
+
+-- Come per le altre tabelle figlie: `room_id` non si accetta dal browser, si
+-- rilegge sempre dal sondaggio, anche negli UPDATE.
+create or replace function public.set_room_id_from_poll() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  select p.room_id into new.room_id from public.room_polls p where p.id = new.poll_id;
+  if new.room_id is null then
+    raise exception 'Sondaggio non disponibile.' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+revoke execute on function public.set_room_id_from_poll() from public, anon, authenticated;
+
+drop trigger if exists trg_room_id on public.room_poll_options;
+create trigger trg_room_id before insert or update on public.room_poll_options
+  for each row execute function public.set_room_id_from_poll();
+
+drop trigger if exists trg_room_id on public.room_poll_votes;
+create trigger trg_room_id before insert or update on public.room_poll_votes
+  for each row execute function public.set_room_id_from_poll();
+
+do $$
+declare t text;
+begin
+  foreach t in array array['room_polls', 'room_poll_options', 'room_poll_votes'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': members', t);
+    execute format('create policy %I on public.%I for all to authenticated using (public.is_room_member(room_id)) with check (public.is_room_member(room_id))', t || ': members', t);
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
+    execute format('grant select on table public.%I to anon, authenticated', t);
+    execute format('grant insert, delete on table public.%I to authenticated', t);
+    -- Senza REPLICA IDENTITY FULL un DELETE porterebbe solo la chiave e il
+    -- filtro realtime su room_id lo scarterebbe.
+    execute format('alter table public.%I replica identity full', t);
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
+-- Aggiornabile solo ciò che cambia davvero: la domanda finché ha senso
+-- correggerla, la chiusura, e l'opzione votata quando si cambia idea.
+-- `room_id` resta del trigger, `created_by` scrivibile solo all'inserimento.
+grant update (question, closes_at) on public.room_polls to authenticated;
+grant update (label) on public.room_poll_options to authenticated;
+grant update (option_id, voted_at) on public.room_poll_votes to authenticated;
+
+notify pgrst, 'reload schema';
+commit;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Feature: rimborsi registrati.
+--
+-- `computeBalances` sa già chi deve quanto a chi, ma il rimborso vero
+-- avviene fuori dall'app: contanti, un bonifico, un giro di birre. Finora
+-- quel passaggio non era registrabile e il saldo restava aperto per
+-- sempre, quindi l'unico modo di "chiudere i conti" era smettere di
+-- guardarli.
+--
+-- Una riga qui è un fatto avvenuto: Tizio ha dato X a Caio. Per questo la
+-- tabella non è aggiornabile — un importo sbagliato si cancella e si
+-- riscrive, invece di essere riscritto sopra lasciando credere a chi lo
+-- aveva già letto che avesse letto male.
+--
+-- `room_id` e la coerenza fra i due membri sono derivati dal server: due
+-- membri di stanze diverse non possono comparire nello stesso rimborso.
+-- ═══════════════════════════════════════════════════════════════════════
+begin;
+
+create table if not exists public.expense_settlements (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  from_member_id uuid not null references public.members(id) on delete cascade,
+  to_member_id uuid not null references public.members(id) on delete cascade,
+  amount numeric not null,
+  note text,
+  recorded_by uuid not null references public.members(id),
+  settled_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  constraint expense_settlements_amount_positive check (amount > 0),
+  constraint expense_settlements_note_length check (note is null or char_length(btrim(note)) between 1 and 80),
+  -- Un rimborso a se stessi non sposta nulla: è sempre un errore di scelta.
+  constraint expense_settlements_distinct_members check (from_member_id <> to_member_id)
+);
+
+create index if not exists idx_expense_settlements_room on public.expense_settlements(room_id, settled_at, id);
+
+create or replace function public.set_room_id_from_settlement() returns trigger
+language plpgsql set search_path = public as $$
+declare v_from uuid; v_to uuid;
+begin
+  select m.room_id into v_from from public.members m where m.id = new.from_member_id;
+  select m.room_id into v_to from public.members m where m.id = new.to_member_id;
+  if v_from is null or v_to is null or v_from <> v_to then
+    raise exception 'I due membri non appartengono allo stesso evento.' using errcode = '42501';
+  end if;
+  new.room_id := v_from;
+  return new;
+end $$;
+revoke execute on function public.set_room_id_from_settlement() from public, anon, authenticated;
+
+drop trigger if exists trg_room_id on public.expense_settlements;
+create trigger trg_room_id before insert or update on public.expense_settlements
+  for each row execute function public.set_room_id_from_settlement();
+
+alter table public.expense_settlements enable row level security;
+drop policy if exists "expense_settlements: members" on public.expense_settlements;
+create policy "expense_settlements: members" on public.expense_settlements for all to authenticated
+  using (public.is_room_member(room_id)) with check (public.is_room_member(room_id));
+revoke all on table public.expense_settlements from public, anon, authenticated;
+grant select on table public.expense_settlements to anon, authenticated;
+-- Nessun UPDATE, di nessuna colonna: si cancella e si riscrive.
+grant insert, delete on table public.expense_settlements to authenticated;
+alter table public.expense_settlements replica identity full;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'expense_settlements'
+  ) then
+    alter publication supabase_realtime add table public.expense_settlements;
+  end if;
+end $$;
+
+notify pgrst, 'reload schema';
+commit;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Fix: l'autore dichiarato deve essere chi scrive.
+--
+-- Cinque tabelle hanno una colonna d'autore scritta dal browser
+-- (`activities.created_by`, `stop_proposals.proposed_by`,
+-- `room_checklist_items.created_by`, più le due nuove). Le policy
+-- verificano l'appartenenza alla stanza, non l'identità: un membro poteva
+-- firmare una riga col nome di un altro membro della stessa stanza.
+--
+-- Il controllo è uno solo, generico sulla colonna passata come argomento,
+-- applicato a tutte e cinque insieme: chiuderne una sola avrebbe lasciato
+-- le altre aperte e reso più difficile accorgersene.
+--
+-- All'INSERT l'autore deve essere chi scrive. All'UPDATE, invece, la
+-- collaborazione resta intatta — chiunque può confermare la tappa proposta
+-- da un altro o assegnarsi un compito scritto da un altro — e si vieta solo
+-- di riscrivere l'autore: quella riga continua a dire chi l'ha creata.
+--
+-- La funzione non è `security definer`: gira coi privilegi di chi scrive e
+-- legge `members` e `member_devices` attraverso le loro policy: il membro
+-- citato è visibile solo se appartiene alla stanza, il device solo se è il
+-- proprio. È la stessa identità di `is_room_member`, membro o device
+-- rivendicato con un link di recupero.
+-- ═══════════════════════════════════════════════════════════════════════
+begin;
+
+create or replace function public.tt_author_is_caller() returns trigger
+language plpgsql set search_path = public as $$
+declare
+  v_member uuid := (to_jsonb(new) ->> tg_argv[0])::uuid;
+begin
+  if tg_op = 'UPDATE' then
+    if v_member is distinct from (to_jsonb(old) ->> tg_argv[0])::uuid then
+      raise exception 'L''autore di una riga non si cambia.' using errcode = '42501';
+    end if;
+    return new;
+  end if;
+
+  if not exists (
+    select 1 from public.members m
+    left join public.member_devices d on d.member_id = m.id
+    where m.id = v_member and (m.auth_user_id = auth.uid() or d.auth_user_id = auth.uid())
+  ) then
+    raise exception 'Puoi scrivere solo a tuo nome.' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+revoke execute on function public.tt_author_is_caller() from public, anon, authenticated;
+
+do $$
+declare r record;
+begin
+  for r in select * from (values
+    ('activities', 'created_by'),
+    ('stop_proposals', 'proposed_by'),
+    ('room_checklist_items', 'created_by'),
+    ('room_polls', 'created_by'),
+    ('expense_settlements', 'recorded_by')
+  ) as t(tbl, col) loop
+    execute format('drop trigger if exists trg_author on public.%I', r.tbl);
+    execute format(
+      'create trigger trg_author before insert or update on public.%I for each row execute function public.tt_author_is_caller(%L)',
+      r.tbl, r.col);
+  end loop;
+end $$;
+
+commit;

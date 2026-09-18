@@ -1,18 +1,28 @@
-import { AlertTriangle, Plus } from 'lucide-react'
+import { AlertTriangle, HandCoins, Plus, Undo2 } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import BottomSheet from '../ui/BottomSheet'
 import TextField from '../ui/TextField'
 import { formatMoney } from '../../lib/format'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
-import { computeBalances, computeTransfers } from '../../lib/balances'
+import { computeBalances, computeTransfers, type Transfer } from '../../lib/balances'
 import { mutateNotify } from '../../lib/db'
 import {
+  deleteSettlement,
   insertGeneralExpense,
   insertGeneralExpenseParticipants,
+  insertSettlement,
   waiveGeneralExpense,
 } from '../../lib/mutations'
-import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member } from '../../types'
+import type {
+  Car,
+  CarExpense,
+  CarPassenger,
+  ExpenseSettlement,
+  GeneralExpense,
+  GeneralExpenseParticipant,
+  Member,
+} from '../../types'
 
 interface SpeseTabProps {
   roomId: string
@@ -23,6 +33,7 @@ interface SpeseTabProps {
   carExpenses: CarExpense[]
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
+  settlements: ExpenseSettlement[]
 }
 
 export default function SpeseTab({
@@ -34,6 +45,7 @@ export default function SpeseTab({
   carExpenses,
   generalExpenses,
   generalExpenseParticipants,
+  settlements,
 }: SpeseTabProps) {
   const [adding, setAdding] = useState(false)
   const [label, setLabel] = useState('')
@@ -43,12 +55,15 @@ export default function SpeseTab({
   const [saving, setSaving] = useState(false)
   const [savedExpenseId, setSavedExpenseId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [settling, setSettling] = useState<Transfer | null>(null)
+  const [settleAmount, setSettleAmount] = useState('')
+  const [settleNote, setSettleNote] = useState('')
   const optimistic = useRoomOptimistic(roomId)
 
   const memberById = (id: string) => members.find((m) => m.id === id)
   const isCreator = currentMember.role === 'creator'
 
-  const balances = computeBalances({ cars, carPassengers, carExpenses, generalExpenses, generalExpenseParticipants })
+  const balances = computeBalances({ cars, carPassengers, carExpenses, generalExpenses, generalExpenseParticipants, settlements })
   const transfers = computeTransfers(balances)
   const hasOpenBalance = transfers.length > 0
 
@@ -67,6 +82,42 @@ export default function SpeseTab({
       }),
       () => waiveGeneralExpense(expenseId, currentMember.id),
       'Condono non salvato.',
+    )
+  }
+
+  // Registrare un rimborso non modifica nessuna spesa: aggiunge il fatto che
+  // dei soldi sono tornati indietro, e i saldi ne tengono conto.
+  async function recordSettlement(e: FormEvent) {
+    e.preventDefault()
+    const value = Number(settleAmount)
+    if (!settling || saving || !Number.isFinite(value) || value <= 0) return
+    setSaving(true)
+    try {
+      const { error } = await mutateNotify(
+        'expense_settlements.insert',
+        insertSettlement(
+          crypto.randomUUID(),
+          settling.fromMemberId,
+          settling.toMemberId,
+          Math.round(value * 100) / 100,
+          settleNote || null,
+          currentMember.id,
+        ),
+        'Rimborso non registrato.',
+      )
+      if (error) return
+      setSettling(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function undoSettlement(settlementId: string) {
+    optimistic(
+      'expense_settlements.delete',
+      (prev) => ({ ...prev, settlements: prev.settlements.filter((s) => s.id !== settlementId) }),
+      () => deleteSettlement(settlementId),
+      'Rimborso non annullato.',
     )
   }
 
@@ -177,11 +228,24 @@ export default function SpeseTab({
           <p className="mb-2 mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Chi deve dare a chi</p>
           <div className="space-y-1.5">
             {transfers.map((t, i) => (
-              <div key={i} className="flex items-center justify-between rounded-xl bg-surface/60 px-3.5 py-2.5 text-[13px]">
-                <span className="text-fg">
-                  {memberById(t.fromMemberId)?.display_name} → {memberById(t.toMemberId)?.display_name}
-                </span>
-                <span className="font-mono text-fg">{formatMoney(t.amount)}</span>
+              <div key={i} className="rounded-xl bg-surface/60 px-3.5 py-2.5 text-[13px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-fg">
+                    {memberById(t.fromMemberId)?.display_name} → {memberById(t.toMemberId)?.display_name}
+                  </span>
+                  <span className="font-mono text-fg">{formatMoney(t.amount)}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSettleAmount(String(t.amount))
+                    setSettleNote('')
+                    setSettling(t)
+                  }}
+                  className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 font-mono text-[10px] text-accent underline"
+                >
+                  <HandCoins size={13} /> segna come rimborsato
+                </button>
               </div>
             ))}
           </div>
@@ -193,6 +257,72 @@ export default function SpeseTab({
           </div>
         </div>
       )}
+
+      {settlements.length > 0 && (
+        <div>
+          <p className="mb-2 mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Rimborsi registrati</p>
+          <div className="space-y-1.5">
+            {[...settlements].reverse().map((s) => (
+              <div key={s.id} className="rounded-xl bg-surface/60 px-3.5 py-2.5 text-[13px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-fg">
+                    {memberById(s.from_member_id)?.display_name ?? '—'} → {memberById(s.to_member_id)?.display_name ?? '—'}
+                  </span>
+                  <span className="font-mono text-fg">{formatMoney(s.amount)}</span>
+                </div>
+                <p className="mt-1 font-mono text-[10px] text-fg-muted">
+                  registrato da {memberById(s.recorded_by)?.display_name ?? '—'}
+                  {s.note && ` · ${s.note}`}
+                </p>
+                {(s.recorded_by === currentMember.id || isCreator) && (
+                  <button
+                    type="button"
+                    onClick={() => undoSettlement(s.id)}
+                    className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 font-mono text-[10px] text-fg-muted underline"
+                  >
+                    <Undo2 size={13} /> annulla
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <BottomSheet
+        open={!!settling}
+        onClose={() => { if (!saving) setSettling(null) }}
+        title="Registra un rimborso"
+      >
+        <form onSubmit={recordSettlement} className="space-y-5" aria-busy={saving}>
+          <p className="text-sm leading-relaxed text-fg-muted">
+            {memberById(settling?.fromMemberId ?? '')?.display_name ?? 'Qualcuno'} ha restituito i soldi a{' '}
+            {memberById(settling?.toMemberId ?? '')?.display_name ?? 'qualcun altro'}. Il saldo si chiude, le spese
+            restano come sono.
+          </p>
+          <TextField
+            label="Quanto ha restituito (€)"
+            type="number"
+            inputMode="decimal"
+            step="0.01"
+            min="0.01"
+            required
+            value={settleAmount}
+            onChange={(event) => setSettleAmount(event.target.value)}
+            hint="Puoi registrare anche un rimborso parziale."
+          />
+          <TextField
+            label="Come (opzionale)"
+            placeholder="Es. contanti, bonifico"
+            maxLength={80}
+            value={settleNote}
+            onChange={(event) => setSettleNote(event.target.value)}
+          />
+          <Button type="submit" className="w-full" disabled={saving || Number(settleAmount) <= 0}>
+            {saving ? 'Salvataggio…' : 'Registra rimborso'}
+          </Button>
+        </form>
+      </BottomSheet>
     </div>
   )
 }

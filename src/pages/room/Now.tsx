@@ -82,6 +82,7 @@ export default function Now() {
         carExpenses={ctx.carExpenses}
         generalExpenses={ctx.generalExpenses}
         generalExpenseParticipants={ctx.generalExpenseParticipants}
+        settlements={ctx.settlements}
         dataIncomplete={dataIncomplete}
         onGoToAuto={() => goTo('viaggio')}
         onGoToSpese={() => goTo('gruppo')}

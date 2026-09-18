@@ -1,4 +1,12 @@
-import type { Car, CarExpense, CarPassenger, GeneralExpense, GeneralExpenseParticipant, Member } from '../types'
+import type {
+  Car,
+  CarExpense,
+  CarPassenger,
+  ExpenseSettlement,
+  GeneralExpense,
+  GeneralExpenseParticipant,
+  Member,
+} from '../types'
 import { computeBalances } from './balances.ts'
 
 // Card "Spese condivise" + "Chi ha pagato" dei mockup. Il netting vive già in
@@ -8,6 +16,9 @@ import { computeBalances } from './balances.ts'
 // Nei mockup un partecipante con 0,00 € era marcato "Deve ancora": qui un
 // saldo chiuso è `settled`, indipendentemente dal fatto che abbia anticipato
 // qualcosa o no. Chi non deve niente non viene sollecitato.
+//
+// I rimborsi registrati entrano nei saldi (computeBalances), non nel totale
+// speso: restituire dei soldi non rende il viaggio più caro, chiude un debito.
 
 const EPSILON = 0.01
 
@@ -37,6 +48,7 @@ interface PaymentsInput {
   carExpenses: CarExpense[]
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
+  settlements: ExpenseSettlement[]
 }
 
 const round = (value: number) => Math.round(value * 100) / 100
