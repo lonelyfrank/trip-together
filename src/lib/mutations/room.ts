@@ -1,6 +1,6 @@
 import type { PostgrestError } from '@supabase/supabase-js'
 import { supabase } from '../supabase'
-import type { DelayReason, StopProposalType, TravelStatus } from '../../types'
+import type { ActivityCategory, ActivityStatus, DelayReason, StopProposalType, TravelStatus } from '../../types'
 
 // Builder Supabase centralizzati per le mutazioni di una stanza.
 // I componenti passano il risultato a mutate / mutateNotify / useRoomOptimistic.
@@ -272,4 +272,65 @@ export const deleteRadarPosition = op(
   'radar_positions.delete',
   (memberId: string) => supabase.from('radar_positions').delete().eq('member_id', memberId),
   { queueable: false },
+)
+
+// ─── Attività (itinerario) ────────────────────────────────────────────────
+// L'id è generato lato client come per le spese: così creare la tappa e
+// iscriversi restano due Op indipendenti, rieseguibili separatamente dalla
+// coda offline senza che la seconda dipenda da un dato restituito dalla prima.
+
+export const insertActivity = op(
+  'activities.insert',
+  (
+    id: string,
+    roomId: string,
+    createdBy: string,
+    fields: {
+      title: string
+      startsAt: string | null
+      category: ActivityCategory
+      placeLabel: string | null
+      pricePerPerson: number | null
+      durationMinutes: number | null
+      note: string | null
+    },
+  ) =>
+    supabase.from('activities').insert({
+      id,
+      room_id: roomId,
+      created_by: createdBy,
+      title: fields.title.trim(),
+      starts_at: fields.startsAt,
+      category: fields.category,
+      place_label: fields.placeLabel?.trim() || null,
+      price_per_person: fields.pricePerPerson,
+      duration_minutes: fields.durationMinutes,
+      note: fields.note?.trim() || null,
+    }),
+)
+
+export const setActivityStatus = op(
+  'activities.setStatus',
+  (activityId: string, status: ActivityStatus) =>
+    supabase.from('activities').update({ status }).eq('id', activityId),
+)
+
+export const deleteActivity = op('activities.delete', (activityId: string) =>
+  supabase.from('activities').delete().eq('id', activityId),
+)
+
+// Aderire è il voto: non esiste una tabella di voti separata, l'interesse del
+// gruppo è la lista dei partecipanti. L'upsert rende il doppio tocco innocuo.
+export const joinActivity = op('activity_participants.join', (activityId: string, memberId: string) =>
+  supabase
+    .from('activity_participants')
+    .upsert({ activity_id: activityId, member_id: memberId }, { onConflict: 'activity_id,member_id' }),
+)
+
+export const leaveActivity = op('activity_participants.leave', (activityId: string, memberId: string) =>
+  supabase
+    .from('activity_participants')
+    .delete()
+    .eq('activity_id', activityId)
+    .eq('member_id', memberId),
 )

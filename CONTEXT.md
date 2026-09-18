@@ -60,7 +60,7 @@ un'identità persa — è coperto dai link di recupero (§6).
 | Backend | **Supabase** | Postgres + PostgREST + Realtime + Auth anonima |
 | PWA | **vite-plugin-pwa 1.3** (Workbox) | `registerType: 'prompt'`, precache dello shell |
 | Lint | **oxlint** | `rules-of-hooks`, `exhaustive-deps`, `require-await` |
-| Test unitari | **`node --test`** nativo | 58 test, 12 file `*.test.ts`, nessun framework |
+| Test unitari | **`node --test`** nativo | 72 test, 15 file `*.test.ts`, nessun framework |
 | Test UI | **Playwright** (dipendenza esterna) | `scripts/uiSmoke.mjs`, `scripts/pwaSmoke.mjs` |
 
 Nessuna libreria di stato globale, di form, di date o di UI kit: tutto quello che
@@ -159,8 +159,19 @@ Punto di ritrovo (`DestinationCard`) e logistica auto (`AutoTab`).
 - **Carico per auto** — checklist di cosa è già in macchina, per singola auto.
 
 ### Attività (`pages/room/Activities.tsx`)
-Itinerario giorno per giorno. **Non ha ancora un modello dati**: la sezione
-dichiara cosa manca invece di mostrare dati finti (vedi §10).
+Itinerario giorno per giorno, su `activities` + `activity_participants`.
+- **I giorni non stanno nel database**: si ricavano dagli `starts_at` distinti
+  delle tappe più l'orario dell'evento (`src/lib/activities.ts`), così un'uscita
+  di un giorno resta di un giorno e `rooms` non cambia. Le tappe senza orario
+  finiscono in un gruppo "Da programmare" in fondo.
+- **Aderire è il voto**: non esiste una tabella di voti, l'interesse del gruppo
+  è la lista dei partecipanti. Soglia di maggioranza identica alle soste (metà
+  più uno). Chi propone una tappa vi aderisce implicitamente.
+- Stati: `proposta` → `confermata` → `prenotata`, più `annullata`. "Da votare" e
+  "In attesa" dei mockup **non** sono stati salvati: descrivono quante adesioni
+  ci sono, non una proprietà della tappa.
+- Conferma, cambio stato ed eliminazione sono riservati al creatore dell'evento
+  o di quella tappa.
 
 ### Gruppo (`pages/room/Group.tsx`)
 Membri (`MembersSection`), spese (`SpeseTab`), compiti e messaggi
@@ -357,6 +368,8 @@ Attenzione ai nomi reali: non `room`, `room_members`, `car_members`, `expenses`.
 - `stop_proposal_votes`: `proposal_id, member_id (pk composita), vote, voted_at, room_id`
 - `ride_requests`: `id, room_id, member_id, status ('pending'|'matched'|'cancelled'), created_at, matched_car_id`
 - `radar_positions`: `member_id (pk), room_id ᴺᴺ, lat, lng, updated_at`
+- `activities`: `id, room_id ᴺᴺ, title, starts_at (null=da programmare), duration_minutes, category ('mare'|'cibo'|'cultura'|'drink'|'panorama'|'altro'), place_label, lat, lng, status ('proposta'|'confermata'|'prenotata'|'annullata'), price_per_person, note, created_by ᴺᴺ, created_at` — check su lunghezza titolo, prezzo non negativo, range coordinate e `(lat is null) = (lng is null)`
+- `activity_participants`: `activity_id, member_id (pk composita), room_id, created_at` — la PK composita rende impossibile il doppio inserimento per costruzione, non per rimedio successivo
 
 ᴺᴺ = `not null` aggiunto dal blocco di fix, con backfill solo da riferimenti
 univoci e interruzione transazionale in caso di ambiguità (nessuna riga
@@ -503,11 +516,11 @@ prova i flussi reali contro il DB in sola DML, creando e ripulendo dati di prova
    reale non è stata provata, per il divieto di eseguire DDL.
 7. `docs/AUDIT.md` è una fotografia storica del 3 agosto 2026 e **non** riflette
    il codice attuale; contiene ancora il project ref Supabase in chiaro.
-8. **Attività/itinerario:** manca il modello dati. Servono due tabelle
-   (`activities`, `activity_participants`, sul pattern di
-   `general_expense_participants` incluso il trigger su `room_id`); i tab-giorno
-   si ricavano dai giorni distinti di `activities.starts_at`, così `rooms` non
-   cambia. Sarà il **quarto** blocco SQL del file di schema.
+8. **Attività:** implementate (4° blocco SQL, applicato). Resta scoperto:
+   `duration_minutes` e `note` sono nello schema ma non ancora modificabili
+   dall'interfaccia, e `created_by` è scrivibile dal client — la stessa
+   esposizione di `stop_proposals.proposed_by` e `room_checklist_items.created_by`,
+   da chiudere su tutte e tre insieme con un trigger, non su una sola.
 9. **Senza sorgente dati** e quindi non implementati, per non mostrare dati
    finti: mappa del percorso e mini-map (nessun provider cartografico nel
    progetto), km/durata/ETA, traffico, stima carburante e pedaggi, bagagli,

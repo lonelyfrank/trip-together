@@ -175,3 +175,32 @@ export interface RoomChecklistItem {
   created_by: string
   created_at: string
 }
+
+export type ActivityCategory = 'mare' | 'cibo' | 'cultura' | 'drink' | 'panorama' | 'altro'
+/** Non contiene "da votare": l'interesse del gruppo si legge dai partecipanti. */
+export type ActivityStatus = 'proposta' | 'confermata' | 'prenotata' | 'annullata'
+
+export interface Activity {
+  id: string
+  room_id: string
+  title: string
+  /** Null = tappa ancora da collocare nel programma. */
+  starts_at: string | null
+  duration_minutes: number | null
+  category: ActivityCategory
+  place_label: string | null
+  lat: number | null
+  lng: number | null
+  status: ActivityStatus
+  price_per_person: number | null
+  note: string | null
+  created_by: string
+  created_at: string
+}
+
+export interface ActivityParticipant {
+  activity_id: string
+  member_id: string
+  room_id: string
+  created_at: string
+}

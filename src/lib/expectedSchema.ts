@@ -23,6 +23,8 @@ export const EXPECTED_TABLES = [
   'stop_proposal_votes',
   'ride_requests',
   'radar_positions',
+  'activities',
+  'activity_participants',
 ] as const
 
 export type ExpectedTable = (typeof EXPECTED_TABLES)[number]
@@ -32,4 +34,5 @@ export const PROBE_COLUMN: Record<string, string> = {
   radar_positions: 'member_id',
   member_devices: 'member_id',
   stop_proposal_votes: 'proposal_id',
+  activity_participants: 'activity_id',
 }

@@ -877,3 +877,115 @@ alter table public.stop_proposals drop column if exists status;
 
 notify pgrst, 'reload schema';
 commit;
+
+-- ═══════════════════════════════════════════════════════════════════════
+-- Feature: attività (itinerario dell'evento).
+--
+-- Due tabelle sole, sul modello già usato per le spese e le loro quote.
+-- Nessuna colonna nuova su `rooms`: i giorni dell'itinerario si ricavano
+-- dai `starts_at` distinti delle attività (più l'orario dell'evento),
+-- quindi un evento di un giorno resta un evento di un giorno e il modello
+-- di dominio non cambia.
+--
+-- `status` ha quattro valori e non contiene "da votare": l'interesse del
+-- gruppo si legge dai partecipanti, come l'esito delle soste si legge dai
+-- voti. Una colonna che ripete ciò che è già derivabile è la colonna che
+-- prima o poi mente — è la ragione per cui `stop_proposals.status` è stata
+-- rimossa.
+--
+-- `activity_participants` ha la chiave primaria composita invece di un `id`
+-- con vincolo unico a parte: qui un doppio inserimento è impossibile per
+-- costruzione, non per rimedio successivo (vedi il fix sulle quote spesa).
+-- ═══════════════════════════════════════════════════════════════════════
+begin;
+
+create table if not exists public.activities (
+  id uuid primary key default gen_random_uuid(),
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  title text not null,
+  -- Null = tappa ancora da collocare nel programma.
+  starts_at timestamptz,
+  duration_minutes int,
+  category text not null default 'altro'
+    check (category in ('mare', 'cibo', 'cultura', 'drink', 'panorama', 'altro')),
+  place_label text,
+  lat float8,
+  lng float8,
+  status text not null default 'proposta'
+    check (status in ('proposta', 'confermata', 'prenotata', 'annullata')),
+  price_per_person numeric,
+  note text,
+  created_by uuid not null references public.members(id),
+  created_at timestamptz not null default now(),
+  -- I vincoli di dominio stanno qui perché il client scrive direttamente su
+  -- questa tabella: senza, l'unica validazione sarebbe quella del browser.
+  constraint activities_title_length check (char_length(btrim(title)) between 1 and 120),
+  constraint activities_duration_positive check (duration_minutes is null or duration_minutes > 0),
+  constraint activities_price_not_negative check (price_per_person is null or price_per_person >= 0),
+  constraint activities_lat_range check (lat is null or lat between -90 and 90),
+  constraint activities_lng_range check (lng is null or lng between -180 and 180),
+  -- Una coordinata da sola non è una posizione.
+  constraint activities_coords_paired check ((lat is null) = (lng is null))
+);
+
+create table if not exists public.activity_participants (
+  activity_id uuid not null references public.activities(id) on delete cascade,
+  member_id uuid not null references public.members(id) on delete cascade,
+  room_id uuid not null references public.rooms(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (activity_id, member_id)
+);
+
+create index if not exists idx_activities_room on public.activities(room_id, starts_at, id);
+create index if not exists idx_activity_participants_room on public.activity_participants(room_id);
+create index if not exists idx_activity_participants_member on public.activity_participants(member_id);
+
+-- Come per le altre tabelle figlie: `room_id` non si accetta dal browser, si
+-- rilegge sempre dal parent, anche negli UPDATE.
+create or replace function public.set_room_id_from_activity() returns trigger
+language plpgsql set search_path = public as $$
+begin
+  select a.room_id into new.room_id from public.activities a where a.id = new.activity_id;
+  if new.room_id is null then
+    raise exception 'Attività non disponibile.' using errcode = '42501';
+  end if;
+  return new;
+end $$;
+revoke execute on function public.set_room_id_from_activity() from public, anon, authenticated;
+
+drop trigger if exists trg_room_id on public.activity_participants;
+create trigger trg_room_id before insert or update on public.activity_participants
+  for each row execute function public.set_room_id_from_activity();
+
+-- RLS scoped come il resto dello schema: una sola policy per tabella, perché
+-- due policy permissive combinerebbero i loro USING in OR.
+do $$
+declare t text;
+begin
+  foreach t in array array['activities', 'activity_participants'] loop
+    execute format('alter table public.%I enable row level security', t);
+    execute format('drop policy if exists %I on public.%I', t || ': members', t);
+    execute format('create policy %I on public.%I for all to authenticated using (public.is_room_member(room_id)) with check (public.is_room_member(room_id))', t || ': members', t);
+    execute format('revoke all on table public.%I from public, anon, authenticated', t);
+    execute format('grant select on table public.%I to anon, authenticated', t);
+    execute format('grant insert, update, delete on table public.%I to authenticated', t);
+    -- Senza REPLICA IDENTITY FULL un DELETE porterebbe solo la chiave e il
+    -- filtro realtime su room_id lo scarterebbe.
+    execute format('alter table public.%I replica identity full', t);
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = t
+    ) then
+      execute format('alter publication supabase_realtime add table public.%I', t);
+    end if;
+  end loop;
+end $$;
+
+-- Il room_id è del trigger, non del client; created_by resta scrivibile solo
+-- all'inserimento.
+revoke update on public.activities from anon, authenticated;
+grant update (title, starts_at, duration_minutes, category, place_label, lat, lng, status, price_per_person, note)
+  on public.activities to authenticated;
+
+notify pgrst, 'reload schema';
+commit;

@@ -9,6 +9,10 @@ export const COLLECTION_ORDER: Record<string, readonly string[]> = {
   radar_positions: ['member_id'], room_checklist_items: ['created_at', 'id'],
   stop_proposals: ['created_at', 'id'], stop_proposal_votes: ['proposal_id', 'member_id'],
   ride_requests: ['created_at', 'id'],
+  // L'itinerario si legge in ordine di orario; le tappe ancora senza orario
+  // finiscono in fondo (nullsFirst: false in roomList).
+  activities: ['starts_at', 'created_at', 'id'],
+  activity_participants: ['activity_id', 'member_id'],
 }
 
 function timestampMicros(value: string): number {

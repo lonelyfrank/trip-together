@@ -6,6 +6,8 @@ import { firstError, query, rows, single } from '../lib/db'
 import { roomRefresh, ROOM_POLL_MS } from '../lib/roomRefresh'
 import { ensureAnonymousSession, supabase } from '../lib/supabase'
 import type {
+  Activity,
+  ActivityParticipant,
   BoardLink,
   BoardNote,
   Car,
@@ -26,7 +28,7 @@ import type {
 
 export interface RoomPayload {
   error: PostgrestError | null
-  sectionErrors: Partial<Record<'auto' | 'spese' | 'bacheca' | 'radar', PostgrestError | null>>
+  sectionErrors: Partial<Record<'auto' | 'spese' | 'bacheca' | 'radar' | 'attivita', PostgrestError | null>>
   room: Room | null
   members: Member[]
   cars: Car[]
@@ -43,6 +45,8 @@ export interface RoomPayload {
   stopProposals: StopProposal[]
   stopProposalVotes: StopProposalVote[]
   rideRequests: RideRequest[]
+  activities: Activity[]
+  activityParticipants: ActivityParticipant[]
 }
 
 const EMPTY_PAYLOAD: RoomPayload = {
@@ -64,6 +68,8 @@ const EMPTY_PAYLOAD: RoomPayload = {
   stopProposals: [],
   stopProposalVotes: [],
   rideRequests: [],
+  activities: [],
+  activityParticipants: [],
 }
 
 export const roomDataKey = (roomId: string) => ['room-data', roomId] as const
@@ -88,6 +94,8 @@ const TABLES: { table: string; key: CollectionKey; pk: string[] }[] = [
   { table: 'stop_proposals', key: 'stopProposals', pk: ['id'] },
   { table: 'stop_proposal_votes', key: 'stopProposalVotes', pk: ['proposal_id', 'member_id'] },
   { table: 'ride_requests', key: 'rideRequests', pk: ['id'] },
+  { table: 'activities', key: 'activities', pk: ['id'] },
+  { table: 'activity_participants', key: 'activityParticipants', pk: ['activity_id', 'member_id'] },
 ]
 const BY_TABLE = new Map(TABLES.map((t) => [t.table, t]))
 
@@ -116,6 +124,8 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     stopProposalsQ,
     stopProposalVotesQ,
     rideRequestsQ,
+    activitiesQ,
+    activityParticipantsQ,
   ] = await Promise.all([
     query<Room>('rooms.byId', supabase.from('rooms').select('*').eq('id', id).maybeSingle()),
     query<Member[]>('members.byRoom', roomList('members', id)),
@@ -142,6 +152,11 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
       roomList('stop_proposal_votes', id),
     ),
     query<RideRequest[]>('ride_requests.byRoom', roomList('ride_requests', id)),
+    query<Activity[]>('activities.byRoom', roomList('activities', id)),
+    query<ActivityParticipant[]>(
+      'activity_participants.byRoom',
+      roomList('activity_participants', id),
+    ),
   ])
 
   return {
@@ -153,6 +168,7 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
       spese: firstError(carPassengersQ, carExpensesQ, generalExpensesQ, generalExpenseParticipantsQ),
       bacheca: firstError(boardNotesQ, boardLinksQ, roomChecklistQ),
       radar: firstError(radarQ),
+      attivita: firstError(activitiesQ, activityParticipantsQ),
     },
     room: single(roomQ),
     members: rows(membersQ),
@@ -170,6 +186,8 @@ async function fetchRoomData(id: string): Promise<RoomPayload> {
     stopProposals: rows(stopProposalsQ),
     stopProposalVotes: rows(stopProposalVotesQ),
     rideRequests: rows(rideRequestsQ),
+    activities: rows(activitiesQ),
+    activityParticipants: rows(activityParticipantsQ),
   }
 }
 
