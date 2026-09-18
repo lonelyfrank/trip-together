@@ -11,7 +11,9 @@
     "check": "npm run typecheck && npm run lint",
     "test": "node --test",
     "db:check": "node scripts/dbCheck.ts",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:ui": "node scripts/uiSmoke.mjs",
+    "test:pwa": "node scripts/pwaSmoke.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.110.8",
@@ -31,6 +33,7 @@
     "oxlint": "^1.71.0",
     "tailwindcss": "^4.3.3",
     "typescript": "~6.0.2",
-    "vite": "^8.1.1"
+    "vite": "^8.1.1",
+    "vite-plugin-pwa": "^1.3.0"
   }
 }

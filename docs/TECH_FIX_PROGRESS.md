@@ -190,6 +190,71 @@ L'utente ha confermato il blocco dei riferimenti/capienza con «fatto».
 Nessun DDL eseguito dall'agente. Rieseguibilità SQL revisionata staticamente,
 non provata tramite due applicazioni autonome (vietate dal piano).
 
-## Fase 5 — da completare
+## Fase 5 — completata
 
-PWA, integrazione smoke UI in package/CI e allineamento dei messaggi operativi.
+Fase 4: commit `74fbcde` (`rendi robuste coda offline mutazioni e assegnazioni auto`).
+
+- Aggiunta l'unica nuova dipendenza diretta autorizzata, `vite-plugin-pwa`.
+  Manifest italiano con favicon SVG esistente e precache dello shell, incluse
+  le pagine caricate su richiesta. Gli aggiornamenti attendono la chiusura
+  delle schede, evitando di interrompere form e sincronizzazione.
+- NetworkFirst soltanto sulle GET REST del progetto Supabase configurato:
+  timeout di rete 3 secondi, massimo 200 risposte per 24 ore. Chiave di cache
+  distinta per hash di Authorization, Accept e Range; il token non viene scritto
+  negli URL o negli header delle richieste memorizzate.
+- Nessuna cache per auth e nessun retry POST del service worker. Le scritture
+  restano gestite esclusivamente dalla coda dell'app. Le risposte già visitate
+  sono disponibili offline per lo stesso token; il rinnovo del token richiede
+  una nuova lettura online. Non si promette una copia offline completa dei dati.
+- `test:ui` e `test:pwa` in package.json; job Chromium obbligatorio sulle pull
+  request, API simulate e build/preview HTTPS. Playwright fissato a 1.62.1 come
+  strumento effimero, senza aggiungerlo alle dipendenze del progetto.
+- Smoke UI ampliato a creazione/join/recovery via RPC e messaggi generici di
+  errore. Service worker disabilitato soltanto in quel test, verificato invece
+  realmente nel test PWA dedicato.
+- Test PWA superato su Chromium con profilo temporaneo: nessun errore di
+  installabilità, reload offline dallo shell, lettura cache per la stessa
+  sessione, nessuna risposta per un'altra sessione, auth/POST esclusi, nessun
+  replay POST dopo il ritorno online. La prima prova di installabilità usava
+  incognito, dove Chromium vieta l'installazione; corretto il contesto del test.
+- Messaggi database e README allineati al flusso SQL Editor. Rimosso il project
+  ref dall'audit storico; modificato soltanto l'header dello snapshot schema.sql.
+- Aggiornamenti compatibili del lockfile tramite `npm audit fix`, senza force
+  né nuovi pacchetti diretti oltre a PWA: audit finale con 0 vulnerabilità.
+- `npm run check && npm test && npm run build`: superato (13 file di test).
+  Smoke UI e PWA superati sull'anteprima di produzione, usando npm exec e il
+  risolutore di Playwright previsto dalla CI. Il job GitHub non è stato eseguito
+  da remoto: configurazione e comandi verificati localmente.
+- Nessun SQL aggiuntivo e nessun DDL eseguito dall'agente.
+
+Riferimenti: [plugin PWA](https://vite-pwa-org.netlify.app/guide/),
+[strategie Workbox](https://developer.chrome.com/docs/workbox/modules/workbox-strategies),
+[plugin di cache Workbox](https://developer.chrome.com/docs/workbox/using-plugins).
+
+## Riepilogo delle scelte e limiti
+
+- **2b:** created_at per car_expenses/car_cargo/board_links; spareggio per ID e
+  chiavi delle tabelle ponte. Stesso ordinamento in query e cache realtime.
+- **4g:** esito soste calcolato sul client, coerente con il resto del prodotto;
+  rimozione dalla UI dopo expires_at + 15 minuti, senza intervalli sulle concluse.
+- **4h:** schema più stretto, backfill soltanto da riferimenti univoci e stop
+  transazionale sulle ambiguità; nessun allargamento dei tipi per ammettere null.
+- **Flag futuri:** misurati separatamente a fine piano, noUncheckedIndexedAccess
+  produce **21** diagnostiche, exactOptionalPropertyTypes **4**. Restano disabilitati
+  come richiesto. no-floating-promises richiede oxlint-tsgolint, non autorizzato.
+- La doppia applicazione SQL non è stata eseguita: il divieto DDL del piano
+  prevale sulla richiesta di provarla. Tutti e tre i blocchi sono stati forniti
+  per l'applicazione manuale, confermati dall'utente e verificati nei flussi reali;
+  la rieseguibilità rimane una verifica statica.
+- Nessuna pubblicazione, push o deploy. Rimangono fuori dal piano il coordinamento
+  della coda fra tab, idempotenza completa di ogni scrittura, rimborsi e archivio
+  vincolato anche dal server, oltre alle prove radar su telefoni fisici.
+
+| Fase | Commit | check / test / build |
+| --- | --- | --- |
+| 0 | fce98ae | tutti superati |
+| 1 | 35cdc71 | tutti superati |
+| 2 | dfd99ce | tutti superati |
+| 3 | 213b0ec | tutti superati |
+| 4 | 74fbcde | tutti superati |
+| 5 | commit che contiene questo resoconto | tutti superati |

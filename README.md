@@ -25,20 +25,37 @@ npm run build       # Build di produzione
 npm run db:check    # Controllo delle tabelle sul progetto Supabase configurato
 ```
 
-`scripts/uiSmoke.mjs` verifica nel browser onboarding, focus dei dialoghi, tab
-persistenti, errori di caricamento, retry delle quote, arresto radar e archivio.
-Le richieste Supabase vengono simulate. Richiede Playwright e Chromium disponibili
-nell'ambiente di test, oltre al dev server già avviato:
+I test browser simulano le API Supabase: verificano i flussi UI, le RPC di ingresso,
+gli errori, la coda offline e la PWA. Playwright è uno strumento di test effimero,
+non una dipendenza dell'app. Per eseguirli sulla build di produzione:
 
 ```bash
-node scripts/uiSmoke.mjs
+npx --yes --package=playwright@1.62.1 playwright install chromium
+npm run build
+npm run preview -- --host 127.0.0.1 --port 4173 --strictPort
+# In un secondo terminale, con preview ancora attiva:
+UI_BASE_URL=https://localhost:4173 npx --yes --package=playwright@1.62.1 -c 'npm run test:ui && npm run test:pwa'
 ```
 
 Se Playwright è installato in un ambiente esterno, imposta `PLAYWRIGHT_MODULE`
 al percorso del suo modulo `index.mjs`. Puoi specificare il browser con
 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` e il server con `UI_BASE_URL`.
-Playwright non è una dipendenza dell'app. Le schermate del controllo sono salvate
-in `/tmp/trip-*.png`.
+Il test PWA richiede `VITE_SUPABASE_URL` uguale a quello usato nella build (legge
+anche `.env`). Le schermate UI sono salvate in `/tmp/trip-*.png`.
+Il job CI esegue entrambi i test su ogni pull request, con Chromium e API simulate.
+
+## Uso offline
+
+La build di produzione include manifest e service worker; dopo il primo caricamento
+online la pagina può riaprirsi senza rete. Le letture REST Supabase già visitate
+usano NetworkFirst e una cache separata per token di sessione, formato e intervallo
+richiesto, con massimo 200 risposte e scadenza a 24 ore. Un rinnovo del token richiede
+nuove letture online; la cache non garantisce la disponibilità di tutti i dati.
+
+Autenticazione e scritture non vengono memorizzate dal service worker. Le modifiche
+offline passano soltanto dalla coda dell'app, che le invia al ritorno della rete e
+segnala gli scarti. Gli aggiornamenti della PWA attendono la chiusura delle schede
+aperte, così un nuovo rilascio non ricarica un form durante la compilazione.
 
 ## Struttura
 
@@ -60,8 +77,9 @@ precedente possono avere già perso parte dei dati, che non vengono ricostruiti.
 ## Stato del refactoring
 
 Vedi [analisi e piano](docs/PRODUCT_REVIEW.md) e
-[interventi implementati e limiti](docs/REFACTOR_PROGRESS.md).
-La protezione degli accessi nel database resta quella del prototipo: le policy
-sono permissive. Il riepilogo in sola lettura è un comportamento dell'interfaccia,
-non un nuovo vincolo server. Il recupero sicuro dell'identità, le transazioni
-server e il flusso dei rimborsi richiedono ancora il successivo intervento sullo schema.
+[primo intervento UI](docs/REFACTOR_PROGRESS.md), seguiti dal
+[resoconto delle sei fasi tecniche](docs/TECH_FIX_PROGRESS.md).
+Gli accessi sono ora limitati dall'appartenenza nel database; creazione, ingresso
+e recupero usano RPC. Capienza auto, quote univoche e riferimenti obbligatori hanno
+vincoli server. Restano futuri il flusso dei rimborsi, l'archiviazione vincolata
+anche dal server e il coordinamento della coda fra più schede.

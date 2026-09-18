@@ -1,68 +1,64 @@
 # Database — Trip Together
 
-La **fonte di verità** dello schema è un unico file:
-[`migrations/20260724000000_schema.sql`](migrations/20260724000000_schema.sql). È
-idempotente (`create ... if not exists`, `drop policy if exists`, guardie sul
-realtime), quindi si può ri-applicare per intero senza errori anche su un
-progetto che ha già parte dello schema.
+La fonte di verità è il solo file
+[`migrations/20260724000000_schema.sql`](migrations/20260724000000_schema.sql).
+Il flusso operativo è manuale nell'SQL Editor di Supabase; la CLI non è collegata.
+`schema.sql` è uno snapshot manuale divergente con operazioni distruttive: non
+usarlo per installare, aggiornare o riparare il database.
 
-## Applicare lo schema (flusso reale: SQL Editor)
+## Applicare lo schema
 
-1. Apri [l'SQL Editor del progetto](https://supabase.com/dashboard/project/bifnswddcovwmpqnvvgi/sql/new).
-2. Copia **tutto** il contenuto di `migrations/20260724000000_schema.sql` e incollalo.
-3. Premi **Run**.
+- **Progetto nuovo e vuoto:** eseguire il file canonico completo nell'SQL Editor
+  del proprio progetto, prima di esporre l'app. Abilitare anche Authentication →
+  Providers → Anonymous sign-ins.
+- **Progetto esistente:** applicare soltanto i nuovi blocchi completi, in ordine,
+  conservando BEGIN/COMMIT dove presenti. Non rilanciare automaticamente la parte
+  storica: contiene policy permissive successivamente sostituite.
 
-Sicuro da rilanciare in qualsiasi momento: su un progetto che ha già lo
-schema applicato non fa nulla di distruttivo, aggiunge solo ciò che manca.
-Abilita anche **Authentication → Providers → Anonymous sign-ins** (una tantum,
-non è parte dello schema SQL).
+I tre blocchi del piano tecnico, già confermati applicati dall'utente, sono:
 
-### Alternativa: Supabase CLI
+1. `Fix: appartenenza server-side, RLS scoped e RPC di ingresso atomiche`.
+2. `Fix: ordine cronologico e quote spesa univoche`.
+3. `Fix: riferimenti obbligatori, capienza auto e soste client-only`.
 
-Se in futuro colleghi la CLI a questo progetto, lo stesso file funziona anche così:
-
-```bash
-supabase link --project-ref bifnswddcovwmpqnvvgi   # una volta
-supabase db push                                   # applica le migration mancanti
-```
+Sono scritti con guardie e definizioni ripetibili. La rieseguibilità è stata
+revisionata staticamente, **non verificata con una seconda esecuzione DDL**.
+Il blocco dei riferimenti interrompe la transazione quando i dati preesistenti
+non consentono un backfill univoco o superano già la capienza: quei dati richiedono
+una correzione esplicita, non vengono eliminati automaticamente.
 
 ## Verificare lo stato
 
 ```bash
-npm run db:check   # elenca le tabelle attese ma assenti sul DB collegato
+npm run db:check
 ```
 
-In DEV il controllo gira anche all'avvio dell'app (warning in console). Nota:
-controlla solo l'**esistenza delle tabelle**, non le colonne — uno schema
-parzialmente disallineato (es. una colonna mancante) può risultare "completo"
-qui pur dando errori 400 a runtime. In caso di dubbio, l'unico modo affidabile
-di verificare è rieseguire lo schema.sql per intero: essendo idempotente, non
-fa danni e colma eventuali buchi.
+In DEV la stessa sonda gira all'avvio. Controlla soltanto l'esistenza delle
+tabelle, non colonne, funzioni, grant, trigger o policy. Un esito positivo non
+certifica l'allineamento completo; confrontare il blocco pertinente con lo schema
+reale prima di intervenire. Non rieseguire lo snapshot per correggere un errore.
 
-## Come estendere lo schema (aggiungere una feature)
+`scripts/verifyMembership.mjs` verifica accessi, inviti, recupero, capienza e
+realtime sul progetto configurato: **crea dati di prova**, ripulisce le righe
+operative e archivia gli eventi, conservando comitive e appartenenze isolate.
+Richiede Playwright e un'app locale avviata (configurazione nel README principale).
+I test `test:ui` e `test:pwa`, invece, simulano le API e non scrivono sul database.
 
-Aggiungi un nuovo blocco **in fondo** a `migrations/20260724000000_schema.sql`,
-seguendo lo stile dei blocchi esistenti:
+## Estendere lo schema
 
-- Intestazione con lo stesso separatore `═══` usato per gli altri blocchi, e
-  una riga di descrizione della feature.
-- Solo istruzioni **idempotenti**: `create table if not exists`, `alter table
-  ... add column if not exists`, `create index if not exists`, `create or
-  replace function`, `drop trigger/policy if exists` prima di ricrearli.
-- Per una tabella nuova, replica il pattern RLS + Realtime già usato (blocco
-  `do $$ ... foreach t in array tbls ...` che abilita RLS permissiva e
-  aggiunge la tabella alla pubblicazione `supabase_realtime` solo se non
-  già presente).
-- Se la tabella ha un `room_id` (o comunque un riferimento diretto a una
-  stanza) verifica se serve anche in `REPLICA IDENTITY FULL` (necessaria
-  perché gli eventi DELETE realtime portino il `room_id`, non solo la PK) —
-  aggiungila all'array nel blocco finale del file.
-- **Non creare un nuovo file di migration.** Un solo file resta la fonte di
-  verità finché il flusso reale è "incolla nell'SQL Editor"; frammentarlo di
-  nuovo ricrea il problema che ha causato questa unificazione (non sapere
-  quale file incollare quando lo schema è disallineato).
+Aggiungere un blocco `Fix: …` in fondo alla migration unica, senza creare nuovi
+file. Usare `if not exists`, `create or replace`, rimozione/ricreazione di policy
+e trigger e transazioni dove servono; verificare anche il comportamento su dati
+preesistenti. Comunicare il blocco esatto da applicare prima del client dipendente.
 
-## File in questa cartella
+Le nuove tabelle devono avere RLS basata sull'appartenenza server, tramite
+`is_room_member` o `is_crew_member`; non copiare le policy permissive storiche.
+I riferimenti denormalizzati alle stanze devono essere derivati dal parent sul
+server. Le operazioni prima dell'appartenenza passano per RPC con input validati,
+`security definer`, `search_path` esplicito e grant limitati.
 
-- `migrations/20260724000000_schema.sql` — **fonte di verità**, unico file, vedi sopra.
-- `schema.sql` — istantanea leggibile **generata** (`supabase db dump -f supabase/schema.sql`); non modificare a mano, non eseguire manualmente (contiene `drop table` distruttivi).
+Aggiungere le tabelle necessarie alla pubblicazione realtime con una guardia.
+Con RLS non assumere che DELETE contenga tutti i campi precedenti, anche con
+REPLICA IDENTITY FULL: il client deve riconciliare tramite chiave primaria e
+rilettura. Verificare INSERT, UPDATE e DELETE dopo la conferma della replica;
+il solo stato SUBSCRIBED non garantisce che PostgreSQL stia già inviando eventi.

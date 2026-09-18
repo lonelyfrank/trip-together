@@ -35,7 +35,7 @@ console.log(`Tabelle presenti: ${present.length}/${EXPECTED_TABLES.length}`)
 if (missing.length > 0) {
   console.log(`\nMANCANTI (${missing.length}):`)
   for (const t of missing) console.log(`  · ${t}`)
-  console.log('\n→ applica le migration con `supabase db push` sul progetto Supabase.')
+  console.log('\n→ esegui nell’SQL Editor di Supabase i blocchi necessari di supabase/migrations/20260724000000_schema.sql.')
   process.exit(1)
 }
 

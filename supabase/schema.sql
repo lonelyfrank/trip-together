@@ -1,9 +1,7 @@
--- ⚠️ FILE GENERATO — NON MODIFICARE A MANO.
--- La fonte di verità dello schema sono le migration in `supabase/migrations/`.
--- Rigenera questo snapshot con:  supabase db dump -f supabase/schema.sql
--- (serve solo come istantanea leggibile; per applicare lo schema usa
---  `supabase db push`, vedi supabase/README.md). Snapshot manuale sotto,
--- da sostituire al primo dump reale.
+-- Snapshot manuale storico, divergente e distruttivo: NON eseguirlo.
+-- Fonte di verità: supabase/migrations/20260724000000_schema.sql.
+-- Applica solo i nuovi blocchi di quella migration tramite SQL Editor Supabase.
+-- La CLI non è collegata; questo file non viene generato né sincronizzato automaticamente.
 
 create extension if not exists pgcrypto;
 

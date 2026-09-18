@@ -1,14 +1,14 @@
 // Test browser con API simulate: nessuna scrittura sul database reale.
 import assert from 'node:assert/strict';
-const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright');
+import { chromium } from './browser.mjs';
 const browser = await chromium.launch({headless:true, executablePath:process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined});
 const base=process.env.UI_BASE_URL || 'https://localhost:5173';
 const roomId='11111111-1111-4111-8111-111111111111';
 const memberId='22222222-2222-4222-8222-222222222222';
 const errors=[];
 async function context(fixture=false) {
-  const ctx=await browser.newContext({ignoreHTTPSErrors:true, timezoneId:'Europe/Rome', viewport:{width:390,height:844}});
-  const state={failTable:null, failParticipants:false, requests:[], tables:{
+  const ctx=await browser.newContext({ignoreHTTPSErrors:true, serviceWorkers:'block', timezoneId:'Europe/Rome', viewport:{width:390,height:844}});
+  const state={enabled:fixture,failTable:null, failParticipants:false, requests:[], tables:{
     rooms:[{id:roomId,title:'Domenica al lago',invite_code:'LAGO42',crew_id:null,destination_label:'Lago di Garda',destination_lat:null,destination_lng:null,event_time:new Date(Date.now()+86400000).toISOString(),status:'open',created_by:'user',created_at:new Date().toISOString()}],
     members:[{id:memberId,room_id:roomId,display_name:'Franco',auth_user_id:'user',role:'creator',confirmed:false,confirmed_at:null},{id:'member-luca',room_id:roomId,display_name:'Luca',role:'guest',confirmed:true}],
     cars:[], car_passengers:[], car_expenses:[], general_expenses:[], general_expense_participants:[], radar_positions:[]
@@ -19,7 +19,18 @@ async function context(fixture=false) {
     state.requests.push({table,method,order:url.searchParams.get('order'),onConflict:url.searchParams.get('on_conflict'),select:url.searchParams.get('select')});
     if(table===state.failTable) return route.fulfill({status:500,json:{message:'Simulated error',code:'TEST'}});
     if(url.pathname.includes('/auth/')) return route.fulfill({json:{access_token:'mock-token',refresh_token:'mock-refresh',expires_in:3600,token_type:'bearer',user:{id:'user',aud:'authenticated',role:'authenticated'}}});
-    if(!fixture) return route.fulfill({json:[]});
+    if(url.pathname.includes('/rpc/')) {
+      const args=req.postDataJSON();
+      if(table==='resolve_invite') return route.fulfill({json:args.p_code==='LAGO42'?{kind:'room',id:roomId}:{kind:'none',id:null}});
+      if(table==='create_room_and_join') {
+        state.enabled=true;state.tables.rooms[0].title=args.p_title;state.tables.members[0].display_name=args.p_display_name;
+        return route.fulfill({json:{id:roomId,member_id:memberId,invite_code:'LAGO42'}});
+      }
+      if(table==='join_room') {state.enabled=true;return route.fulfill({json:memberId});}
+      if(table==='claim_member') {state.enabled=true;return route.fulfill({json:'Franco'});}
+      if(table==='list_crew_events') return route.fulfill({json:[]});
+    }
+    if(!state.enabled) return route.fulfill({json:[]});
     if(method==='PATCH') {
       const values=req.postDataJSON();
       state.tables[table]=(state.tables[table]??[]).map(item=>({...item,...values}));
@@ -41,6 +52,7 @@ async function context(fixture=false) {
     const rows=state.tables[table]??[];
     return route.fulfill({json:req.headers().accept?.includes('object') ? rows[0]??null : rows});
   });
+  await ctx.route('https://www.google.com/maps/**',route=>route.fulfill({contentType:'text/html',body:''}));
   const page=await ctx.newPage();
   page.on('pageerror',error=>errors.push(error.message));
   return {ctx,page,state};
@@ -201,6 +213,30 @@ try {
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('tt:offline-queue')).length),0);
     console.log('PASS conferma presenza e nota offline con feedback; operazione irrecuperabile scartata con avviso e coda sbloccata');
     await ctx.close();
+  }
+  {
+    const {ctx,page,state}=await context();
+    await page.goto(base);await page.getByRole('button',{name:'Crea un evento',exact:true}).click();
+    await page.getByLabel('Nome dell’evento').fill('Evento via RPC');await page.getByLabel('Il tuo nome').fill('Franco');
+    await page.getByRole('dialog').getByRole('button',{name:'Crea evento',exact:true}).click();
+    await page.getByRole('heading',{name:'Evento via RPC',exact:true}).waitFor();
+    assert(state.requests.some(req=>req.table==='create_room_and_join'));
+    assert.equal(state.requests.filter(req=>['rooms','members'].includes(req.table)&&req.method==='POST').length,0);
+    await ctx.close();
+    const joined=await context(true);
+    await joined.page.goto(`${base}/join/LAGO42`);await joined.page.getByLabel('Il tuo nome').fill('Franco');
+    joined.state.failTable='join_room';
+    await joined.page.getByRole('button',{name:'Entra nella stanza',exact:true}).click();
+    await joined.page.getByText('Non riusciamo a completare l’ingresso. Controlla l’invito e riprova.',{exact:true}).waitFor();
+    assert.equal(await joined.page.getByText('Simulated error',{exact:true}).count(),0);
+    joined.state.failTable=null;await joined.page.getByRole('button',{name:'Entra nella stanza',exact:true}).click();
+    await joined.page.getByRole('heading',{name:'Domenica al lago',exact:true}).waitFor();
+    assert(joined.state.requests.some(req=>req.table==='resolve_invite'));
+    const token=Buffer.from(JSON.stringify({roomId,memberId,inviteCode:'LAGO42'})).toString('base64url');
+    await joined.page.goto(`${base}/resume/${token}`);await joined.page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    assert(joined.state.requests.some(req=>req.table==='claim_member'));
+    console.log('PASS creazione, invito e recupero via RPC; errore di ingresso leggibile senza dettaglio SQL');
+    await joined.ctx.close();
   }
   assert.deepEqual(errors,[]);console.log('PASS nessun errore JavaScript');
 } finally {await browser.close()}

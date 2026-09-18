@@ -28,6 +28,6 @@ export async function checkSchema(): Promise<void> {
   console.warn(
     `[schema] ${missing.length}/${EXPECTED_TABLES.length} tabelle MANCANTI sul DB collegato:\n` +
       missing.map((t) => `  · ${t}`).join('\n') +
-      `\n→ applica le migration con \`supabase db push\` sul progetto Supabase.`,
+      `\n→ esegui nell’SQL Editor di Supabase i blocchi necessari di supabase/migrations/20260724000000_schema.sql.`,
   )
 }

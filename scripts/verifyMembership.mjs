@@ -2,6 +2,7 @@
 // i dati di prova e archivia l'evento. Nessun DDL e nessuna service-role key.
 import assert from 'node:assert/strict'
 import { createClient } from '@supabase/supabase-js'
+import { chromium } from './browser.mjs'
 
 process.loadEnvFile('.env')
 const url = process.env.VITE_SUPABASE_URL
@@ -97,7 +98,6 @@ try {
   console.log(`REALTIME INSERT=ok UPDATE=ok DELETE_filtrato=${received.some((e) => e.eventType === 'DELETE' && e.old.id === noteId)} DELETE_senza_filtro=${deleteUnfiltered.some((e) => e.old.id === noteId)}`)
   await owner.removeChannel(channel)
 
-  const { chromium } = await import(process.env.PLAYWRIGHT_MODULE || 'playwright')
   browser = await chromium.launch({ headless: true, executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || undefined })
   const base = process.env.UI_BASE_URL || 'https://localhost:5173'
   const browserErrors = []
