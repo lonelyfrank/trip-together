@@ -1,26 +1,22 @@
-import { ArrowLeft, Calendar, Check, ChevronRight, MapPin, Plus, Share2, Users } from 'lucide-react'
+import { ArrowLeft, Calendar, CalendarPlus, Check, ChevronRight, MapPin, Plus, Share2, UserRound, Users, UsersRound } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import Avatar from '../components/ui/Avatar'
 import BottomSheet from '../components/ui/BottomSheet'
 import Button from '../components/ui/Button'
 import Card from '../components/ui/Card'
 import Chip from '../components/ui/Chip'
+import EmptyState from '../components/ui/EmptyState'
 import ScreenHeader from '../components/ui/ScreenHeader'
+import SectionHeader from '../components/ui/SectionHeader'
+import TextField from '../components/ui/TextField'
 import { SkeletonCard, SkeletonHeader } from '../components/ui/Skeleton'
 import { useCrewData } from '../hooks/useCrewData'
+import { tintForRoom } from '../lib/eventTint'
+import { formatEventTime } from '../lib/format'
 import { getMyName, getSavedCrewEntry } from '../lib/localRooms'
 import { createRoomAndJoin, joinRoomAsMember } from '../lib/membership'
-import { tintForRoom } from '../lib/eventTint'
-
-function formatEventTime(iso: string): string {
-  return new Date(iso).toLocaleString('it-IT', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
+import { shareOrCopy } from '../lib/share'
 
 export default function CrewPage() {
   const { crewId } = useParams<{ crewId: string }>()
@@ -37,7 +33,7 @@ export default function CrewPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-canvas">
+      <div className="mx-auto flex min-h-svh max-w-4xl flex-col">
         <SkeletonHeader />
         <div className="flex-1 space-y-2.5 px-4 pb-10 sm:px-6">
           <SkeletonCard />
@@ -49,21 +45,21 @@ export default function CrewPage() {
 
   if (loadError) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
-        <p className="text-danger">Errore nel caricamento della comitiva.</p>
-        <p className="font-mono text-[11px] text-fg-muted">Controlla la connessione e riprova.</p>
-        <button onClick={() => window.location.reload()} className="text-sm text-fg underline">
+      <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-danger">Non riusciamo a caricare la comitiva.</p>
+        <p className="text-sm text-fg-muted">Controlla la connessione e riprova.</p>
+        <Button variant="outline" onClick={() => window.location.reload()}>
           Riprova
-        </button>
+        </Button>
       </div>
     )
   }
 
   if (notFound || !crew || !entry) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
-        <p className="text-fg">Comitiva non trovata o non ne fai parte.</p>
-        <button onClick={() => navigate('/')} className="text-sm text-fg-muted underline">
+      <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-fg">Comitiva non trovata, o non ne fai parte.</p>
+        <button onClick={() => navigate('/')} className="min-h-11 text-sm text-fg-muted underline">
           Torna alla home
         </button>
       </div>
@@ -95,27 +91,21 @@ export default function CrewPage() {
       navigate(`/room/${roomId}`)
     } catch (err) {
       console.error('[ingresso evento comitiva]', err)
-      setError('Non riusciamo ad aprire l’evento. Potrebbe essere archiviato: chiedi un link di recupero a chi partecipava.')
+      setError(
+        'Non riusciamo ad aprire l’evento. Potrebbe essere archiviato: chiedi un link di recupero a chi partecipava.',
+      )
     }
   }
 
   async function invite() {
-    const url = `${window.location.origin}/join/${crew!.invite_code}`
-    const shareData = { title: crew!.name, text: `Unisciti alla comitiva "${crew!.name}"`, url }
-    if (navigator.share) {
-      try {
-        await navigator.share(shareData)
-        return
-      } catch {
-        /* annullata: ripiega sulla copia */
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(url)
+    const result = await shareOrCopy({
+      title: crew!.name,
+      text: `Unisciti alla comitiva "${crew!.name}" su Trip Together`,
+      url: `${window.location.origin}/join/${crew!.invite_code}`,
+    })
+    if (result === 'copied') {
       setShared(true)
       setTimeout(() => setShared(false), 1500)
-    } catch {
-      /* niente clipboard: il codice resta visibile nell'header */
     }
   }
 
@@ -123,113 +113,152 @@ export default function CrewPage() {
   const closedEvents = events.filter((r) => r.status === 'closed')
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-canvas">
-      <button
-        onClick={() => navigate('/')}
-        className="flex items-center gap-1 px-4 pt-3 font-mono text-[12px] text-fg-muted active:opacity-60 sm:px-6"
-      >
-        <ArrowLeft size={13} /> home
-      </button>
+    <div className="mx-auto flex min-h-svh max-w-4xl flex-col">
+      <div className="flex items-center justify-between gap-3 px-4 pt-3 sm:px-6">
+        <button
+          onClick={() => navigate('/')}
+          className="flex min-h-11 items-center gap-1 text-[13px] text-fg-muted active:opacity-60"
+        >
+          <ArrowLeft aria-hidden="true" size={15} /> Home
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate('/profilo')}
+          aria-label="Apri il tuo profilo"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-fg-muted shadow-card"
+        >
+          <UserRound aria-hidden="true" size={19} />
+        </button>
+      </div>
+
       <ScreenHeader
         eyebrow={`Comitiva · #${crew.invite_code}`}
         title={crew.name}
-        action={<Chip tone="teal">{members.length} partecipanti</Chip>}
+        action={<Chip tone="ok">{members.length} partecipanti</Chip>}
       />
 
-      <div className="flex-1 space-y-5 px-4 pb-28 sm:px-6">
-        {error && !creating && <p role="alert" className="text-sm text-danger">{error}</p>}
-        <div>
-          <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Partecipanti</p>
+      <div className="page-content flex-1 space-y-7 px-4 sm:px-6">
+        {error && !creating && (
+          <p role="alert" className="rounded-2xl border border-danger/25 bg-danger/10 p-4 text-sm text-danger">
+            {error}
+          </p>
+        )}
+
+        <section aria-label="Partecipanti">
+          <SectionHeader
+            icon={UsersRound}
+            title="Partecipanti"
+            hint="Lo stesso gruppo a ogni evento"
+          />
           <div className="flex flex-wrap gap-1.5">
             {members.map((m) => (
               <span
                 key={m.id}
-                className="flex items-center gap-1.5 rounded-full bg-surface/60 px-2.5 py-1 text-[12px] text-fg"
+                className="flex items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-[13px] text-fg shadow-card"
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-on-accent">
-                  {m.display_name[0]?.toUpperCase()}
-                </span>
+                <Avatar name={m.display_name} seed={m.id} size="sm" />
                 {m.display_name}
                 {m.id === entry.crewMemberId && <span className="text-fg-muted">(tu)</span>}
               </span>
             ))}
           </div>
-          <Button variant="surface" size="sm" className="mt-3 w-full" onClick={invite}>
+          <Button variant="surface" size="sm" className="mt-3 w-full sm:w-auto" onClick={invite}>
             {shared ? <Check size={14} /> : <Share2 size={14} />}
             {shared ? 'Link copiato!' : 'Invita nella comitiva'}
           </Button>
-        </div>
+        </section>
 
-        <div>
-          <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Eventi</p>
-          {openEvents.length === 0 && (
-            <p className="text-sm text-fg-muted">Nessun evento ancora. Creane uno per questa comitiva.</p>
-          )}
-          <div className="space-y-2.5">
-            {openEvents.map((room) => (
-              <Card key={room.id} onClick={() => openEvent(room.id, room.invite_code)}>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-                    style={{ background: `${tintForRoom(room.id)}22` }}
-                  >
-                    <Users size={19} style={{ color: tintForRoom(room.id) }} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-serif text-[16px] leading-tight text-fg">{room.title}</p>
-                    <div className="mt-0.5 flex flex-col gap-0.5">
-                      {room.event_time && (
-                        <span className="flex items-center gap-1 font-mono text-[11px] text-fg-muted">
-                          <Calendar size={10} /> {formatEventTime(room.event_time)}
-                        </span>
-                      )}
-                      {room.destination_label && (
-                        <span className="flex items-center gap-1 truncate font-mono text-[11px] text-fg-muted">
-                          <MapPin size={10} /> {room.destination_label}
-                        </span>
-                      )}
+        <section aria-label="Eventi">
+          <SectionHeader icon={Calendar} title="Eventi" hint={`${openEvents.length} in programma`} />
+          {openEvents.length === 0 ? (
+            <EmptyState
+              icon={CalendarPlus}
+              title="Nessun evento in programma"
+              hint="Crea il primo evento della comitiva: i partecipanti ci entrano senza reinvito."
+              action={
+                <Button variant="surface" size="sm" onClick={() => setCreating(true)}>
+                  <Plus size={15} /> Crea evento
+                </Button>
+              }
+            />
+          ) : (
+            <ul className="grid gap-2.5 md:grid-cols-2">
+              {openEvents.map((room) => (
+                <li key={room.id}>
+                  <Card onClick={() => openEvent(room.id, room.invite_code)}>
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                        style={{ background: `${tintForRoom(room.id)}22` }}
+                      >
+                        <Users aria-hidden="true" size={19} style={{ color: tintForRoom(room.id) }} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-serif text-[16px] leading-tight text-fg">{room.title}</p>
+                        <p className="mt-1 flex flex-col gap-0.5 text-[12px] text-fg-muted">
+                          <span className="flex items-center gap-1.5">
+                            <Calendar aria-hidden="true" size={12} />
+                            {room.event_time ? formatEventTime(room.event_time) : 'Data da scegliere'}
+                          </span>
+                          <span className="flex items-center gap-1.5 truncate">
+                            <MapPin aria-hidden="true" size={12} />
+                            {room.destination_label || 'Destinazione da scegliere'}
+                          </span>
+                        </p>
+                      </div>
+                      <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-fg-muted" />
                     </div>
-                  </div>
-                  <ChevronRight size={16} className="shrink-0 text-fg-muted" />
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
+                  </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
         {closedEvents.length > 0 && (
-          <div>
-            <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Archiviati</p>
-            <div className="space-y-2.5">
+          <section aria-label="Eventi archiviati">
+            <SectionHeader title="Archiviati" hint="Consultabili, non modificabili" />
+            <ul className="grid gap-2 md:grid-cols-2">
               {closedEvents.map((room) => (
-                <Card key={room.id} tone="flat" onClick={() => navigate(`/room/${room.id}`)}>
-                  <p className="truncate text-[14px] text-fg">{room.title}</p>
-                </Card>
+                <li key={room.id}>
+                  <Card tone="flat" onClick={() => navigate(`/room/${room.id}`)}>
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="min-w-0 truncate text-[14px] text-fg-muted">{room.title}</p>
+                      <ChevronRight aria-hidden="true" size={15} className="shrink-0 text-fg-muted" />
+                    </div>
+                  </Card>
+                </li>
               ))}
-            </div>
-          </div>
+            </ul>
+          </section>
         )}
       </div>
 
-      <BottomSheet open={creating} onClose={() => setCreating(false)} title="Nuovo evento">
-        <form onSubmit={createEvent} className="flex flex-col gap-3">
-          {error && <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">{error}</p>}
-          <input
+      <BottomSheet open={creating} onClose={() => { if (!submitting) setCreating(false) }} title="Nuovo evento">
+        <form onSubmit={createEvent} className="space-y-5" aria-busy={submitting}>
+          {error && (
+            <p role="alert" className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">
+              {error}
+            </p>
+          )}
+          <TextField
+            label="Nome dell’evento"
+            placeholder="Es. Mare a giugno"
             autoFocus
-            className="rounded-lg border border-line bg-canvas px-3 py-2.5 text-fg placeholder:text-fg-muted"
-            placeholder="Nome evento (es. Mare a giugno)"
+            required
+            maxLength={80}
             value={title}
             onChange={(e) => setTitle(e.target.value)}
           />
-          <Button type="submit" disabled={submitting || !title.trim()}>
-            {submitting ? 'Creazione...' : 'Crea evento'}
+          <Button type="submit" className="w-full" disabled={submitting || !title.trim()}>
+            {submitting ? 'Creazione in corso…' : 'Crea evento'}
           </Button>
         </form>
       </BottomSheet>
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg bg-gradient-to-t from-canvas via-canvas px-4 pb-8 pt-4 sm:px-6">
-        <Button className="w-full" onClick={() => setCreating(true)}>
-          <Plus size={16} /> Crea evento
+      <div className="bottom-actions fixed inset-x-0 bottom-0 z-20 mx-auto flex max-w-lg gap-3 bg-gradient-to-t from-canvas via-canvas px-4 pt-4 sm:px-6">
+        <Button className="flex-1" onClick={() => setCreating(true)}>
+          <Plus size={17} /> Nuovo evento
         </Button>
       </div>
     </div>

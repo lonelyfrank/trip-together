@@ -51,6 +51,26 @@ export default defineConfig(({ mode }) => {
         }],
       },
     })],
+    build: {
+      rollupOptions: {
+        output: {
+          // Le librerie cambiano solo quando si aggiorna una dipendenza: in un
+          // chunk a parte restano in cache fra i deploy invece di essere
+          // riscaricate a ogni modifica del codice applicativo. Non riduce il
+          // primo caricamento — supabase serve comunque subito — ma evita che
+          // 430 kB scadano per una virgola cambiata in un componente.
+          manualChunks(id) {
+            if (!id.includes('node_modules')) return undefined
+            if (id.includes('@supabase')) return 'vendor-supabase'
+            if (id.includes('@tanstack')) return 'vendor-query'
+            if (/node_modules\/(react|react-dom|react-router|react-router-dom|scheduler)\//.test(id)) {
+              return 'vendor-react'
+            }
+            return undefined
+          },
+        },
+      },
+    },
     server: { host: true },
   }
 })
