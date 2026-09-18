@@ -28,9 +28,9 @@ export default class ErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children
 
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
-        <p className="text-coral">Qualcosa è andato storto.</p>
-        <p className="font-mono text-[11px] text-muted">{this.state.error.message}</p>
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
+        <p className="text-danger">Qualcosa è andato storto.</p>
+        <p className="font-mono text-[11px] text-fg-muted">{this.state.error.message}</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
           Ricarica
         </Button>

@@ -59,7 +59,7 @@ export default function TravelStatusChip({ car, currentMemberId, canEdit }: Trav
           {meta.label}
         </Chip>
       </button>
-      <span className="font-mono text-[10px] text-muted">
+      <span className="font-mono text-[10px] text-fg-muted">
         aggiornato {formatRelativeTime(car.travel_status_updated_at)}
       </span>
 
@@ -71,9 +71,9 @@ export default function TravelStatusChip({ car, currentMemberId, canEdit }: Trav
               <button
                 key={status}
                 onClick={() => setStatus(status)}
-                className="flex w-full items-center justify-between rounded-2xl bg-ink px-4 py-3.5 transition-transform active:scale-[0.98]"
+                className="flex w-full items-center justify-between rounded-2xl bg-canvas px-4 py-3.5 transition-transform active:scale-[0.98]"
               >
-                <p className="text-[13px] font-medium text-cream">{optionMeta.label}</p>
+                <p className="text-[13px] font-medium text-fg">{optionMeta.label}</p>
                 <Chip tone={optionMeta.tone}>&nbsp;</Chip>
               </button>
             )

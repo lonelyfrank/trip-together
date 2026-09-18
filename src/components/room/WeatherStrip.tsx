@@ -29,11 +29,11 @@ export default function WeatherStrip({ lat, lng, eventTime }: WeatherStripProps)
   })
 
   if (isPending) {
-    return <div className="mt-3 h-9 animate-pulse rounded-xl bg-ink/60" />
+    return <div className="mt-3 h-9 animate-pulse rounded-xl bg-canvas/60" />
   }
   if (isError || !weather) {
     return (
-      <p className="mt-3 rounded-xl bg-ink/60 px-3 py-2 font-mono text-[10px] text-muted">
+      <p className="mt-3 rounded-xl bg-canvas/60 px-3 py-2 font-mono text-[10px] text-fg-muted">
         Meteo non disponibile al momento.
       </p>
     )
@@ -43,20 +43,20 @@ export default function WeatherStrip({ lat, lng, eventTime }: WeatherStripProps)
   const Icon = ICONS[meta.icon]
 
   return (
-    <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/60 px-3 py-2">
-      <Icon size={20} className="shrink-0 text-teal" />
+    <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-canvas/60 px-3 py-2">
+      <Icon size={20} className="shrink-0 text-accent" />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-cream">{meta.label}</p>
-        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted">
+        <p className="text-[13px] text-fg">{meta.label}</p>
+        <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-fg-muted">
           {weather.kind === 'forecast' ? 'Previsto per l’evento' : 'Adesso a destinazione'}
         </p>
       </div>
       {weather.kind === 'forecast' ? (
-        <p className="shrink-0 font-mono text-[13px] text-cream">
+        <p className="shrink-0 font-mono text-[13px] text-fg">
           {weather.tempMin}° / {weather.tempMax}°
         </p>
       ) : (
-        <p className="shrink-0 font-mono text-[15px] text-cream">{weather.temp}°</p>
+        <p className="shrink-0 font-mono text-[15px] text-fg">{weather.temp}°</p>
       )}
     </div>
   )

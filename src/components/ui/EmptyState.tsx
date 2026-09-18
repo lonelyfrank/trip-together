@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
-// Sostituisce i <p className="text-sm text-muted">Nessuna nota ancora.</p>
+// Sostituisce i <p className="text-sm text-fg-muted">Nessuna nota ancora.</p>
 // sparsi in sei punti: uno stato vuoto dice anche cosa fare, non solo che non
 // c'è niente.
 interface EmptyStateProps {

@@ -33,14 +33,14 @@ export default function Resume() {
 
   if (status === 'invalid') {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink px-6 py-10 text-center">
-        <p className="text-cream">Non riusciamo a recuperare la partecipazione. Controlla la connessione e il link ricevuto, poi riprova.</p>
-        <button onClick={() => navigate('/')} className="mt-4 text-sm text-muted underline">
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-canvas px-6 py-10 text-center">
+        <p className="text-fg">Non riusciamo a recuperare la partecipazione. Controlla la connessione e il link ricevuto, poi riprova.</p>
+        <button onClick={() => navigate('/')} className="mt-4 text-sm text-fg-muted underline">
           Torna alla home
         </button>
       </div>
     )
   }
 
-  return <div className="flex min-h-svh items-center justify-center bg-ink text-muted">Recupero identità...</div>
+  return <div className="flex min-h-svh items-center justify-center bg-canvas text-fg-muted">Recupero identità...</div>
 }

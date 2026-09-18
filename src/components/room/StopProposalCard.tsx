@@ -69,36 +69,36 @@ export default function StopProposalCard({ proposal, votes, eligibleMembers, cur
   return (
     <Card tone={outcome === 'pending' ? 'highlight' : 'flat'}>
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-cream">
+        <div className="flex items-center gap-1.5 text-fg">
           <Icon size={14} />
           <span className="text-[13px] font-medium">{meta.label}</span>
         </div>
         <Chip tone={outcomeMeta.tone}>{outcomeMeta.label}</Chip>
       </div>
 
-      {proposal.note && <p className="mb-2 text-[12px] text-muted">{proposal.note}</p>}
+      {proposal.note && <p className="mb-2 text-[12px] text-fg-muted">{proposal.note}</p>}
 
       {outcome === 'pending' && (
-        <div className="mb-2 h-1 overflow-hidden rounded-full bg-ink">
-          <div className="h-full bg-amber transition-all" style={{ width: `${fraction * 100}%` }} />
+        <div className="mb-2 h-1 overflow-hidden rounded-full bg-canvas">
+          <div className="h-full bg-warn transition-all" style={{ width: `${fraction * 100}%` }} />
         </div>
       )}
 
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] text-muted">
+        <span className="font-mono text-[10px] text-fg-muted">
           {yes} sì · {no} no · {eligibleMembers.length} aventi diritto
         </span>
         {canVote && (
           <div className="flex gap-1.5">
             <button
               onClick={() => castVote('yes')}
-              className={`rounded-full px-3 py-1 text-[11px] ${myVote === 'yes' ? 'bg-teal text-ink' : 'bg-ink text-muted'}`}
+              className={`rounded-full px-3 py-1 text-[11px] ${myVote === 'yes' ? 'bg-accent text-on-accent' : 'bg-canvas text-fg-muted'}`}
             >
               Sì
             </button>
             <button
               onClick={() => castVote('no')}
-              className={`rounded-full px-3 py-1 text-[11px] ${myVote === 'no' ? 'bg-coral text-ink' : 'bg-ink text-muted'}`}
+              className={`rounded-full px-3 py-1 text-[11px] ${myVote === 'no' ? 'bg-danger text-on-accent' : 'bg-canvas text-fg-muted'}`}
             >
               No
             </button>

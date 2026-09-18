@@ -57,18 +57,18 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
   if (editing) {
     return (
       <form onSubmit={save} className="mt-2 flex flex-col gap-2">
-        <label className="flex items-center gap-2 rounded-lg border border-border-soft bg-ink px-3 py-2">
-          <Calendar size={13} className="shrink-0 text-muted" />
+        <label className="flex items-center gap-2 rounded-lg border border-line bg-canvas px-3 py-2">
+          <Calendar size={13} className="shrink-0 text-fg-muted" />
           <input
             type="datetime-local"
             autoFocus
-            className="w-full bg-transparent text-[13px] text-cream outline-none"
+            className="w-full bg-transparent text-[13px] text-fg outline-none"
             value={value}
             onChange={(e) => setValue(e.target.value)}
           />
         </label>
         {error && (
-          <p className="rounded-lg bg-coral/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-coral">{error}</p>
+          <p className="rounded-lg bg-danger/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-danger">{error}</p>
         )}
         <div className="flex items-center gap-2">
           <Button type="submit" variant="teal" size="sm" disabled={saving}>
@@ -81,7 +81,7 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
             <button
               type="button"
               onClick={() => persist(null)}
-              className="ml-auto font-mono text-[10px] text-muted underline"
+              className="ml-auto font-mono text-[10px] text-fg-muted underline"
             >
               rimuovi
             </button>
@@ -95,7 +95,7 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
     return (
       <button
         onClick={startEditing}
-        className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-muted active:opacity-60"
+        className="mt-1 flex items-center gap-1.5 font-mono text-[11px] text-fg-muted active:opacity-60"
       >
         <Calendar size={11} />
         {new Date(room.event_time).toLocaleString('it-IT', {
@@ -113,7 +113,7 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
   return (
     <button
       onClick={startEditing}
-      className="mt-1.5 flex items-center gap-1 font-mono text-[11px] text-muted active:opacity-60"
+      className="mt-1.5 flex items-center gap-1 font-mono text-[11px] text-fg-muted active:opacity-60"
     >
       <Plus size={11} /> Aggiungi data e ora
     </button>

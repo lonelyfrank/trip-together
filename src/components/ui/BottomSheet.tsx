@@ -49,13 +49,13 @@ export default function BottomSheet({ open, onClose, title, children }: BottomSh
         const rect = event.currentTarget.getBoundingClientRect()
         if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) onClose()
       }}
-      className="sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[90dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-[28px] border border-border-strong bg-ink-deep px-6 pt-3 text-cream shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
+      className="sheet fixed inset-x-0 bottom-0 top-auto m-0 mx-auto max-h-[90dvh] w-full max-w-lg overflow-y-auto overscroll-contain rounded-t-[28px] border border-line-strong bg-overlay px-6 pt-3 text-fg shadow-2xl sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-3xl"
     >
-      <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-border-dashed sm:hidden" />
+      <div aria-hidden="true" className="mx-auto mb-4 h-1 w-10 rounded-full bg-line-dashed sm:hidden" />
       <div className="mb-4 flex items-center justify-between">
-        <h2 id={titleId} className="font-serif text-xl text-cream">{title}</h2>
+        <h2 id={titleId} className="font-serif text-xl text-fg">{title}</h2>
         <button type="button" aria-label="Chiudi pannello" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-surface">
-          <X size={18} className="text-muted" />
+          <X size={18} className="text-fg-muted" />
         </button>
       </div>
       {children}

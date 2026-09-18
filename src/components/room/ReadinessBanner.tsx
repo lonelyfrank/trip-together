@@ -40,15 +40,15 @@ export default function ReadinessBanner({ room, currentMember, members, cars, ca
   }
 
   return (
-    <Card tone={win === 't2' ? 'surface' : 'highlight'} className={win === 't2' ? 'border-coral/25 bg-coral/10' : ''}>
+    <Card tone={win === 't2' ? 'surface' : 'highlight'} className={win === 't2' ? 'border-danger/25 bg-danger/10' : ''}>
       <div className="mb-2 flex items-center gap-1.5">
-        <AlertTriangle size={13} className={win === 't2' ? 'text-coral' : 'text-amber'} />
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-cream">
+        <AlertTriangle size={13} className={win === 't2' ? 'text-danger' : 'text-warn'} />
+        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-fg">
           {win === 't2' ? 'Si parte tra meno di 2 ore' : 'Si parte tra meno di 24 ore'}
         </span>
       </div>
 
-      <p className="mb-1 text-[13px] text-muted">
+      <p className="mb-1 text-[13px] text-fg-muted">
         {confirmedCount}/{members.length} confermati
         {withoutCarCount > 0 && ` · ${withoutCarCount} senza auto assegnata`}
       </p>

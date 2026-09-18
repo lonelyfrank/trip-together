@@ -94,7 +94,7 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
   return (
     <div className="flex flex-col items-center">
       <div className="mb-4 flex w-full items-center justify-between">
-        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-muted">
+        <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-fg-muted">
           {active ? 'Radar attivo' : 'Radar in pausa'}
         </p>
         <Button aria-pressed={active} variant={active ? 'teal' : 'surface'} size="sm" onClick={toggle}>
@@ -102,9 +102,9 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
         </Button>
       </div>
 
-      {error && <p className="mb-3 w-full text-sm text-coral">{error}</p>}
+      {error && <p className="mb-3 w-full text-sm text-danger">{error}</p>}
 
-      <p className="mb-4 w-full text-center text-[11px] leading-relaxed text-muted">
+      <p className="mb-4 w-full text-center text-[11px] leading-relaxed text-fg-muted">
         Il radar si ferma quando esci da questa sezione. La posizione non viene conservata come storico; la precisione dipende dal segnale GPS. Se perdi la connessione, l’ultima posizione può restare visibile per alcuni minuti.
       </p>
 
@@ -112,14 +112,14 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
         {RING_RADII_PX.map((r) => (
           <div
             key={r}
-            className="absolute rounded-full border border-border-soft"
+            className="absolute rounded-full border border-line"
             style={{ width: r * 2, height: r * 2, opacity: active ? 1 : 0.4 }}
           />
         ))}
 
         {active && myPos && (
           <div
-            className="absolute h-52 w-52 rounded-full border border-teal/25"
+            className="absolute h-52 w-52 rounded-full border border-accent/25"
             style={{ animation: 'radar-ping 2.8s ease-out infinite' }}
           />
         )}
@@ -149,28 +149,28 @@ export default function RadarTab({ room, currentMember, members, radarPositions 
                 className="absolute flex flex-col items-center gap-1"
                 style={{ transform: `translate(${x}px, ${y}px)` }}
               >
-                <div className="h-3 w-3 rounded-full bg-amber shadow-[0_0_10px_var(--color-amber)]" />
-                <span className="whitespace-nowrap rounded-full bg-ink-deep/85 px-1.5 py-0.5 font-mono text-[10px] text-cream">
+                <div className="h-3 w-3 rounded-full bg-warn shadow-[0_0_10px_var(--color-amber)]" />
+                <span className="whitespace-nowrap rounded-full bg-overlay/85 px-1.5 py-0.5 font-mono text-[10px] text-fg">
                   {memberById(p.member_id)?.display_name ?? '?'} · {formatDistance(dist)}
                 </span>
               </div>
             )
           })}
 
-        <Compass size={16} className={`absolute top-2 ${active ? 'text-muted' : 'text-border-dashed'}`} />
+        <Compass size={16} className={`absolute top-2 ${active ? 'text-fg-muted' : 'text-line-dashed'}`} />
 
         {active && myPos && others.length === 0 && (
-          <p className="absolute px-10 text-center font-mono text-[11px] leading-relaxed text-muted">
+          <p className="absolute px-10 text-center font-mono text-[11px] leading-relaxed text-fg-muted">
             nessun altro ha il radar attivo al momento
           </p>
         )}
         {active && !myPos && !error && (
-          <p className="absolute px-10 text-center font-mono text-[11px] leading-relaxed text-muted">
+          <p className="absolute px-10 text-center font-mono text-[11px] leading-relaxed text-fg-muted">
             in attesa del segnale GPS...
           </p>
         )}
         {!active && (
-          <p className="absolute px-10 text-center font-mono text-[12px] leading-relaxed text-muted">
+          <p className="absolute px-10 text-center font-mono text-[12px] leading-relaxed text-fg-muted">
             nessuna posizione condivisa
           </p>
         )}

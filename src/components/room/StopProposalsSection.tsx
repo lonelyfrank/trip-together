@@ -67,7 +67,7 @@ export default function StopProposalsSection({
     <div className="space-y-2">
       {proposals.length > 0 && (
         <>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">{title}</p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">{title}</p>
           <div className="space-y-2">
             {proposals.map((p) => (
               <StopProposalCard
@@ -96,14 +96,14 @@ export default function StopProposalsSection({
                 key={t}
                 type="button"
                 onClick={() => setType(t)}
-                className={`rounded-full px-3 py-1.5 text-[12px] ${type === t ? 'bg-amber text-ink' : 'bg-ink text-muted'}`}
+                className={`rounded-full px-3 py-1.5 text-[12px] ${type === t ? 'bg-warn text-on-accent' : 'bg-canvas text-fg-muted'}`}
               >
                 {TYPE_LABELS[t]}
               </button>
             ))}
           </div>
           <input
-            className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-[13px] text-cream placeholder:text-muted"
+            className="rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted"
             placeholder="Nota breve (opzionale)"
             maxLength={80}
             value={note}

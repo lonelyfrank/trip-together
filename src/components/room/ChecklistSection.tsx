@@ -63,7 +63,7 @@ export default function ChecklistSection({ roomId, currentMember, members, items
 
   return (
     <div className="space-y-2">
-      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Cosa portiamo (tutta la comitiva)</p>
+      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Cosa portiamo (tutta la comitiva)</p>
       <div className="space-y-1.5">
         {items.map((item) => {
           const assignee = memberById(item.assigned_to)
@@ -72,32 +72,32 @@ export default function ChecklistSection({ roomId, currentMember, members, items
             <div key={item.id} className="flex items-center gap-2 rounded-xl bg-surface/60 px-3.5 py-2.5">
               <button onClick={() => toggleStatus(item)} disabled={!canToggle} className="shrink-0">
                 {item.status === 'portato' ? (
-                  <Check size={15} className="text-teal" />
+                  <Check size={15} className="text-accent" />
                 ) : (
-                  <Circle size={15} className={canToggle ? 'text-border-dashed' : 'text-border-soft'} />
+                  <Circle size={15} className={canToggle ? 'text-line-dashed' : 'text-line'} />
                 )}
               </button>
-              <span className={`flex-1 text-[13px] ${item.status === 'portato' ? 'text-muted line-through' : 'text-cream'}`}>
+              <span className={`flex-1 text-[13px] ${item.status === 'portato' ? 'text-fg-muted line-through' : 'text-fg'}`}>
                 {item.title}
               </span>
               {assignee ? (
-                <span className="shrink-0 font-mono text-[10px] text-muted">{assignee.display_name}</span>
+                <span className="shrink-0 font-mono text-[10px] text-fg-muted">{assignee.display_name}</span>
               ) : (
-                <button onClick={() => selfAssign(item)} className="shrink-0 font-mono text-[10px] text-teal underline">
+                <button onClick={() => selfAssign(item)} className="shrink-0 font-mono text-[10px] text-accent underline">
                   non assegnato
                 </button>
               )}
             </div>
           )
         })}
-        {items.length === 0 && <p className="text-sm text-muted">Nessuna voce ancora.</p>}
+        {items.length === 0 && <p className="text-sm text-fg-muted">Nessuna voce ancora.</p>}
       </div>
 
       {adding ? (
         <form onSubmit={addItem} className="flex gap-2">
           <input
             autoFocus
-            className="flex-1 rounded-lg border border-border-soft bg-surface px-3 py-2 text-[13px] text-cream placeholder:text-muted"
+            className="flex-1 rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted"
             placeholder="Es. Ghiaccio, altoparlante, ombrelloni..."
             value={title}
             onChange={(e) => setTitle(e.target.value)}

@@ -153,12 +153,12 @@ export default function AutoTab({
           {addingCar ? (
             <Card>
               <form onSubmit={createCar} className="flex flex-col gap-2">
-                <p className="mb-1 text-[13px] text-cream">Quanti posti ha la tua auto (incluso tu)?</p>
+                <p className="mb-1 text-[13px] text-fg">Quanti posti ha la tua auto (incluso tu)?</p>
                 <input
                   type="number"
                   min={1}
                   autoFocus
-                  className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
+                  className="rounded-lg border border-line bg-canvas px-3 py-2 text-fg placeholder:text-fg-muted"
                   value={seats}
                   onChange={(e) => setSeats(e.target.value)}
                 />
@@ -199,11 +199,11 @@ export default function AutoTab({
 
         return (
           <Card key={car.id} tone={car.id === myCarId ? 'highlight' : 'surface'}>
-            {car.id === myCarId && <p className="mb-3 text-xs font-medium uppercase tracking-widest text-teal">La tua auto</p>}
+            {car.id === myCarId && <p className="mb-3 text-xs font-medium uppercase tracking-widest text-accent">La tua auto</p>}
             <div className="mb-2.5 flex items-start justify-between">
               <div>
-                <p className="font-serif text-[16px] leading-none text-cream">Auto di {driver?.display_name ?? '—'}</p>
-                <p className="mt-0.5 font-mono text-[10px] text-muted">conducente</p>
+                <p className="font-serif text-[16px] leading-none text-fg">Auto di {driver?.display_name ?? '—'}</p>
+                <p className="mt-0.5 font-mono text-[10px] text-fg-muted">conducente</p>
               </div>
               <TravelStatusChip car={car} currentMemberId={currentMember.id} canEdit={iAmThisDriver || iAmInThisCar} />
             </div>
@@ -211,23 +211,23 @@ export default function AutoTab({
             <div className="mb-2.5 flex items-center justify-between">
               <Chip tone="teal">{passengers.length + 1}/{car.seats_total} posti</Chip>
               {iAmThisDriver && (
-                <button onClick={() => removeCar(car.id)} className="text-[10px] text-coral underline">
+                <button onClick={() => removeCar(car.id)} className="text-[10px] text-danger underline">
                   elimina
                 </button>
               )}
             </div>
 
             <div className="mb-3 flex flex-wrap gap-1.5">
-              <span className="rounded-full bg-amber/15 px-2.5 py-1 text-[11px] font-medium text-amber">
+              <span className="rounded-full bg-warn/15 px-2.5 py-1 text-[11px] font-medium text-warn">
                 {driver?.display_name ?? '?'}
               </span>
               {passengers.map((p) => (
-                <span key={p.member_id} className="rounded-full bg-ink px-2.5 py-1 text-[11px] text-cream">
+                <span key={p.member_id} className="rounded-full bg-canvas px-2.5 py-1 text-[11px] text-fg">
                   {memberById(p.member_id)?.display_name ?? '?'}
                 </span>
               ))}
               {Array.from({ length: Math.max(freeSeats, 0) }).map((_, i) => (
-                <span key={i} className="rounded-full border border-dashed border-border-dashed px-2.5 py-1 text-[11px] text-muted">
+                <span key={i} className="rounded-full border border-dashed border-line-dashed px-2.5 py-1 text-[11px] text-fg-muted">
                   posto libero
                 </span>
               ))}
@@ -245,7 +245,7 @@ export default function AutoTab({
             )}
 
             {showTravelZone && (
-              <div className="mt-3 space-y-3 border-t border-border-soft pt-2.5">
+              <div className="mt-3 space-y-3 border-t border-line pt-2.5">
                 <DelayReportBadge
                   carId={car.id}
                   currentMemberId={currentMember.id}
@@ -268,13 +268,13 @@ export default function AutoTab({
             )}
 
             {expenses.length > 0 && (
-              <div className="mb-2.5 mt-3 space-y-1.5 border-t border-border-soft pt-2.5">
+              <div className="mb-2.5 mt-3 space-y-1.5 border-t border-line pt-2.5">
                 {expenses.map((e) => (
                   <div key={e.id} className="flex items-center justify-between text-[12px]">
-                    <span className="flex items-center gap-1.5 text-muted">
+                    <span className="flex items-center gap-1.5 text-fg-muted">
                       <Fuel size={11} /> {e.label}
                     </span>
-                    <span className="font-mono text-cream">{formatMoney(e.amount)}</span>
+                    <span className="font-mono text-fg">{formatMoney(e.amount)}</span>
                   </div>
                 ))}
               </div>
@@ -286,7 +286,7 @@ export default function AutoTab({
       })}
 
       {cars.length === 0 && !addingCar && (
-        <p className="text-center text-sm text-muted">Nessuna auto dichiarata ancora.</p>
+        <p className="text-center text-sm text-fg-muted">Nessuna auto dichiarata ancora.</p>
       )}
 
       <RideRequestsSection
@@ -301,17 +301,17 @@ export default function AutoTab({
 
       {unassigned.length > 0 && (
         <div className="space-y-2">
-          <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Senza auto</p>
+          <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Senza auto</p>
           {unassigned
             .filter((m) => !rideRequests.some((r) => r.member_id === m.id && r.status === 'pending'))
             .map((m) => (
             <Card key={m.id} tone="dashed" className="flex items-center justify-between !p-3.5">
-              <p className="text-[13px] text-cream">{m.display_name}</p>
+              <p className="text-[13px] text-fg">{m.display_name}</p>
               {cars.length > 0 && (
                 <select
                   defaultValue=""
                   onChange={(e) => e.target.value && assignMember(e.target.value, m.id)}
-                  className="rounded-lg border border-border-soft bg-ink px-2 py-1 text-[11px] text-cream"
+                  className="rounded-lg border border-line bg-canvas px-2 py-1 text-[11px] text-fg"
                 >
                   <option value="" disabled>
                     Assegna...
@@ -364,19 +364,19 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
   }
 
   return (
-    <div className="border-t border-border-soft pt-2.5">
-      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-muted">
+    <div className="border-t border-line pt-2.5">
+      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-fg-muted">
         <Package size={11} /> Carico di questa auto
       </p>
       <div className="space-y-1">
         {cargo.map((c) => (
           <button key={c.id} onClick={() => toggle(c)} className="flex w-full items-center gap-2 text-left text-[12px]">
             {c.packed ? (
-              <Check size={13} className="shrink-0 text-teal" />
+              <Check size={13} className="shrink-0 text-accent" />
             ) : (
-              <Circle size={13} className="shrink-0 text-border-dashed" />
+              <Circle size={13} className="shrink-0 text-line-dashed" />
             )}
-            <span className={c.packed ? 'text-muted line-through' : 'text-cream'}>{c.item}</span>
+            <span className={c.packed ? 'text-fg-muted line-through' : 'text-fg'}>{c.item}</span>
           </button>
         ))}
       </div>
@@ -384,7 +384,7 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
         <form onSubmit={addItem} className="mt-2 flex gap-1.5">
           <input
             autoFocus
-            className="flex-1 rounded-lg border border-border-soft bg-ink px-2 py-1 text-[12px] text-cream placeholder:text-muted"
+            className="flex-1 rounded-lg border border-line bg-canvas px-2 py-1 text-[12px] text-fg placeholder:text-fg-muted"
             placeholder="Es. Ombrelloni"
             value={item}
             onChange={(e) => setItem(e.target.value)}
@@ -396,7 +396,7 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="mt-2 flex items-center gap-1 font-mono text-[10px] text-muted active:opacity-60"
+          className="mt-2 flex items-center gap-1 font-mono text-[10px] text-fg-muted active:opacity-60"
         >
           <Plus size={11} /> aggiungi oggetto
         </button>

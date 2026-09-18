@@ -58,19 +58,19 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
 
   if (activeDelay) {
     return (
-      <div className="flex items-center justify-between rounded-xl border border-coral/25 bg-coral/10 px-3.5 py-2.5">
+      <div className="flex items-center justify-between rounded-xl border border-danger/25 bg-danger/10 px-3.5 py-2.5">
         <div className="flex items-center gap-2">
-          <AlertTriangle size={13} className="shrink-0 text-coral" />
+          <AlertTriangle size={13} className="shrink-0 text-danger" />
           <div>
-            <p className="text-[12px] text-cream">
+            <p className="text-[12px] text-fg">
               Ritardo: {REASON_LABELS[activeDelay.reason]}
               {activeDelay.minutes_estimate ? ` · ~${activeDelay.minutes_estimate} min` : ''}
             </p>
-            <p className="font-mono text-[10px] text-muted">segnalato {formatRelativeTime(activeDelay.created_at)}</p>
+            <p className="font-mono text-[10px] text-fg-muted">segnalato {formatRelativeTime(activeDelay.created_at)}</p>
           </div>
         </div>
         {canReport && (
-          <button onClick={resolve} className="shrink-0 font-mono text-[10px] text-muted underline">
+          <button onClick={resolve} className="shrink-0 font-mono text-[10px] text-fg-muted underline">
             risolto
           </button>
         )}
@@ -94,7 +94,7 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
                 key={r}
                 onClick={() => setReason(r)}
                 className={`rounded-full px-3 py-1.5 text-[12px] ${
-                  reason === r ? 'bg-coral text-ink' : 'bg-ink text-muted'
+                  reason === r ? 'bg-danger text-on-accent' : 'bg-canvas text-fg-muted'
                 }`}
               >
                 {REASON_LABELS[r]}
@@ -102,21 +102,21 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
             ))}
           </div>
 
-          <div className="flex items-center justify-between rounded-xl bg-ink px-4 py-2.5">
-            <span className="text-[12px] text-muted">Minuti stimati (opzionale)</span>
+          <div className="flex items-center justify-between rounded-xl bg-canvas px-4 py-2.5">
+            <span className="text-[12px] text-fg-muted">Minuti stimati (opzionale)</span>
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setMinutes((m) => (m && m > 5 ? m - 5 : null))}
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-cream"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-fg"
               >
                 −
               </button>
-              <span className="w-16 text-center font-mono text-[12px] text-cream">
+              <span className="w-16 text-center font-mono text-[12px] text-fg">
                 {minutes ? `~${minutes} min` : '—'}
               </span>
               <button
                 onClick={() => setMinutes((m) => (m ?? 0) + 5)}
-                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-cream"
+                className="flex h-6 w-6 items-center justify-center rounded-full bg-surface text-fg"
               >
                 +
               </button>

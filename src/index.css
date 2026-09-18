@@ -8,10 +8,11 @@
    (ridefinibili a runtime) e non ai valori. Senza `inline` il tema non
    sarebbe commutabile.
 
-   I nomi legacy della palette "obsidian" (ink, cream, amber, teal…) sono
-   mantenuti come alias: i componenti già scritti continuano a funzionare
-   in entrambi i temi e la migrazione ai nomi semantici procede per gruppi
-   di file, non in un unico passaggio.
+   La palette "obsidian" originale sopravvive come tema scuro, ma i suoi
+   nomi (ink, cream, amber, teal…) non esistono più come utility: erano
+   alias di transizione, rimossi a migrazione completata. Una classe
+   inesistente non è un errore in Tailwind — viene scartata in silenzio —
+   quindi non reintrodurli.
    ═══════════════════════════════════════════════════════════════════════ */
 
 @theme inline {
@@ -44,21 +45,9 @@
   --shadow-card: var(--tt-shadow-card);
   --shadow-raised: var(--tt-shadow-raised);
 
-  /* ── Alias legacy "obsidian" → token semantici ───────────────────────
-     Da non usare nel codice nuovo. Vengono rimossi quando i 36 file
-     esistenti sono migrati ai nomi semantici. */
-  --color-ink: var(--tt-canvas);
-  --color-ink-deep: var(--tt-overlay);
-  --color-cream: var(--tt-fg);
-  --color-muted: var(--tt-fg-muted);
-  --color-border-soft: var(--tt-line);
-  --color-border-strong: var(--tt-line-strong);
-  --color-border-dashed: var(--tt-line-dashed);
+  /* Gradiente della card evidenziata. */
   --color-highlight-from: var(--tt-highlight-from);
   --color-highlight-to: var(--tt-highlight-to);
-  --color-teal: var(--tt-accent);
-  --color-amber: var(--tt-warn);
-  --color-coral: var(--tt-danger);
 }
 
 /* ── Tema chiaro (default) ───────────────────────────────────────────────

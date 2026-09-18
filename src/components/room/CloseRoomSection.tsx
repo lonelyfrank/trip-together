@@ -75,37 +75,37 @@ export default function CloseRoomSection({
 
   return (
     <Card tone={hasOpenBalance ? 'surface' : 'highlight'} className="mt-1">
-      <div className="mb-2 flex items-center gap-1.5 text-muted">
+      <div className="mb-2 flex items-center gap-1.5 text-fg-muted">
         <Lock size={13} strokeWidth={2.5} />
         <span className="text-xs font-medium uppercase tracking-widest">Archivia evento</span>
       </div>
 
       {hasOpenBalance ? (
         <>
-          <div className="flex items-start gap-2 rounded-xl border border-coral/25 bg-coral/10 px-4 py-3">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-coral" />
-            <p className="text-[11px] leading-relaxed text-cream">
+          <div className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/10 px-4 py-3">
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+            <p className="text-[11px] leading-relaxed text-fg">
               Ci sono {transfers.length} saldi aperti. Controlla il riepilogo prima di archiviare.
             </p>
           </div>
-          <button onClick={onGoToSpese} className="mt-2 font-mono text-[11px] text-muted underline">
+          <button onClick={onGoToSpese} className="mt-2 font-mono text-[11px] text-fg-muted underline">
             Vai al riepilogo spese →
           </button>
         </>
       ) : (
         <>
-          <p className="mb-3 text-[13px] text-muted">
+          <p className="mb-3 text-[13px] text-fg-muted">
             L’evento resterà consultabile con partecipanti, auto, spese e bacheca. Le posizioni radar verranno rimosse.
           </p>
           <Button variant="outline" className="w-full" onClick={() => setConfirming(true)} disabled={closing || !online}>
             Archivia evento
           </Button>
-          {!online && <p className="mt-2 text-sm text-muted">Torna online per archiviare l’evento.</p>}
+          {!online && <p className="mt-2 text-sm text-fg-muted">Torna online per archiviare l’evento.</p>}
         </>
       )}
       <BottomSheet open={confirming} onClose={() => { if (!closing) setConfirming(false) }} title="Archivia questo evento?">
-        <p className="mb-5 text-sm leading-relaxed text-muted">Potrai rileggere il riepilogo dalla Home. Nell’archivio le modifiche non saranno disponibili.</p>
-        {error && <p role="alert" className="mb-4 text-sm text-coral">{error}</p>}
+        <p className="mb-5 text-sm leading-relaxed text-fg-muted">Potrai rileggere il riepilogo dalla Home. Nell’archivio le modifiche non saranno disponibili.</p>
+        {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
         <Button className="w-full" onClick={handleClose} disabled={closing || !online || hasOpenBalance}>{closing ? 'Archiviazione…' : 'Conferma archiviazione'}</Button>
       </BottomSheet>
     </Card>

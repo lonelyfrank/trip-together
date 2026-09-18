@@ -37,7 +37,7 @@ export default function CrewPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink">
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-canvas">
         <SkeletonHeader />
         <div className="flex-1 space-y-2.5 px-4 pb-10 sm:px-6">
           <SkeletonCard />
@@ -49,10 +49,10 @@ export default function CrewPage() {
 
   if (loadError) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
-        <p className="text-coral">Errore nel caricamento della comitiva.</p>
-        <p className="font-mono text-[11px] text-muted">Controlla la connessione e riprova.</p>
-        <button onClick={() => window.location.reload()} className="text-sm text-cream underline">
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
+        <p className="text-danger">Errore nel caricamento della comitiva.</p>
+        <p className="font-mono text-[11px] text-fg-muted">Controlla la connessione e riprova.</p>
+        <button onClick={() => window.location.reload()} className="text-sm text-fg underline">
           Riprova
         </button>
       </div>
@@ -61,9 +61,9 @@ export default function CrewPage() {
 
   if (notFound || !crew || !entry) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-ink px-6 text-center">
-        <p className="text-cream">Comitiva non trovata o non ne fai parte.</p>
-        <button onClick={() => navigate('/')} className="text-sm text-muted underline">
+      <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
+        <p className="text-fg">Comitiva non trovata o non ne fai parte.</p>
+        <button onClick={() => navigate('/')} className="text-sm text-fg-muted underline">
           Torna alla home
         </button>
       </div>
@@ -123,10 +123,10 @@ export default function CrewPage() {
   const closedEvents = events.filter((r) => r.status === 'closed')
 
   return (
-    <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-ink">
+    <div className="mx-auto flex min-h-svh max-w-lg flex-col bg-canvas">
       <button
         onClick={() => navigate('/')}
-        className="flex items-center gap-1 px-4 pt-3 font-mono text-[12px] text-muted active:opacity-60 sm:px-6"
+        className="flex items-center gap-1 px-4 pt-3 font-mono text-[12px] text-fg-muted active:opacity-60 sm:px-6"
       >
         <ArrowLeft size={13} /> home
       </button>
@@ -137,20 +137,20 @@ export default function CrewPage() {
       />
 
       <div className="flex-1 space-y-5 px-4 pb-28 sm:px-6">
-        {error && !creating && <p role="alert" className="text-sm text-coral">{error}</p>}
+        {error && !creating && <p role="alert" className="text-sm text-danger">{error}</p>}
         <div>
-          <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Partecipanti</p>
+          <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Partecipanti</p>
           <div className="flex flex-wrap gap-1.5">
             {members.map((m) => (
               <span
                 key={m.id}
-                className="flex items-center gap-1.5 rounded-full bg-surface/60 px-2.5 py-1 text-[12px] text-cream"
+                className="flex items-center gap-1.5 rounded-full bg-surface/60 px-2.5 py-1 text-[12px] text-fg"
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-teal text-[10px] font-semibold text-ink">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-on-accent">
                   {m.display_name[0]?.toUpperCase()}
                 </span>
                 {m.display_name}
-                {m.id === entry.crewMemberId && <span className="text-muted">(tu)</span>}
+                {m.id === entry.crewMemberId && <span className="text-fg-muted">(tu)</span>}
               </span>
             ))}
           </div>
@@ -161,9 +161,9 @@ export default function CrewPage() {
         </div>
 
         <div>
-          <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Eventi</p>
+          <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Eventi</p>
           {openEvents.length === 0 && (
-            <p className="text-sm text-muted">Nessun evento ancora. Creane uno per questa comitiva.</p>
+            <p className="text-sm text-fg-muted">Nessun evento ancora. Creane uno per questa comitiva.</p>
           )}
           <div className="space-y-2.5">
             {openEvents.map((room) => (
@@ -176,21 +176,21 @@ export default function CrewPage() {
                     <Users size={19} style={{ color: tintForRoom(room.id) }} />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-serif text-[16px] leading-tight text-cream">{room.title}</p>
+                    <p className="truncate font-serif text-[16px] leading-tight text-fg">{room.title}</p>
                     <div className="mt-0.5 flex flex-col gap-0.5">
                       {room.event_time && (
-                        <span className="flex items-center gap-1 font-mono text-[11px] text-muted">
+                        <span className="flex items-center gap-1 font-mono text-[11px] text-fg-muted">
                           <Calendar size={10} /> {formatEventTime(room.event_time)}
                         </span>
                       )}
                       {room.destination_label && (
-                        <span className="flex items-center gap-1 truncate font-mono text-[11px] text-muted">
+                        <span className="flex items-center gap-1 truncate font-mono text-[11px] text-fg-muted">
                           <MapPin size={10} /> {room.destination_label}
                         </span>
                       )}
                     </div>
                   </div>
-                  <ChevronRight size={16} className="shrink-0 text-muted" />
+                  <ChevronRight size={16} className="shrink-0 text-fg-muted" />
                 </div>
               </Card>
             ))}
@@ -199,11 +199,11 @@ export default function CrewPage() {
 
         {closedEvents.length > 0 && (
           <div>
-            <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Archiviati</p>
+            <p className="mb-2.5 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Archiviati</p>
             <div className="space-y-2.5">
               {closedEvents.map((room) => (
                 <Card key={room.id} tone="flat" onClick={() => navigate(`/room/${room.id}`)}>
-                  <p className="truncate text-[14px] text-cream">{room.title}</p>
+                  <p className="truncate text-[14px] text-fg">{room.title}</p>
                 </Card>
               ))}
             </div>
@@ -213,10 +213,10 @@ export default function CrewPage() {
 
       <BottomSheet open={creating} onClose={() => setCreating(false)} title="Nuovo evento">
         <form onSubmit={createEvent} className="flex flex-col gap-3">
-          {error && <p className="rounded-xl bg-coral/10 px-4 py-2 text-sm text-coral">{error}</p>}
+          {error && <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">{error}</p>}
           <input
             autoFocus
-            className="rounded-lg border border-border-soft bg-ink px-3 py-2.5 text-cream placeholder:text-muted"
+            className="rounded-lg border border-line bg-canvas px-3 py-2.5 text-fg placeholder:text-fg-muted"
             placeholder="Nome evento (es. Mare a giugno)"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
@@ -227,7 +227,7 @@ export default function CrewPage() {
         </form>
       </BottomSheet>
 
-      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg bg-gradient-to-t from-ink via-ink px-4 pb-8 pt-4 sm:px-6">
+      <div className="fixed inset-x-0 bottom-0 mx-auto max-w-lg bg-gradient-to-t from-canvas via-canvas px-4 pb-8 pt-4 sm:px-6">
         <Button className="w-full" onClick={() => setCreating(true)}>
           <Plus size={16} /> Crea evento
         </Button>

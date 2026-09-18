@@ -75,31 +75,31 @@ export default function BachecaTab({
 
   return (
     <div className="space-y-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Note</p>
+      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Note</p>
       <div className="space-y-2">
         {notes.map((n) => (
           <Card key={n.id} tone={n.pinned ? 'highlight' : 'surface'} className="flex gap-2.5 !p-3.5">
-            <ClipboardList size={15} className={`mt-0.5 shrink-0 ${n.pinned ? 'text-amber' : 'text-muted'}`} />
-            <p className="flex-1 text-[13px] leading-relaxed text-cream">{n.text}</p>
+            <ClipboardList size={15} className={`mt-0.5 shrink-0 ${n.pinned ? 'text-warn' : 'text-fg-muted'}`} />
+            <p className="flex-1 text-[13px] leading-relaxed text-fg">{n.text}</p>
             <button onClick={() => togglePin(n)} className="shrink-0">
-              <Pin size={14} className={n.pinned ? 'fill-amber text-amber' : 'text-muted'} />
+              <Pin size={14} className={n.pinned ? 'fill-warn text-warn' : 'text-fg-muted'} />
             </button>
           </Card>
         ))}
-        {notes.length === 0 && <p className="text-sm text-muted">Nessuna nota ancora.</p>}
+        {notes.length === 0 && <p className="text-sm text-fg-muted">Nessuna nota ancora.</p>}
       </div>
 
       {addingNote ? (
         <form onSubmit={addNote} className="flex flex-col gap-2">
           <textarea
             autoFocus
-            className="rounded-lg border border-border-soft bg-surface px-3 py-2 text-[13px] text-cream placeholder:text-muted"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted"
             placeholder="Scrivi una nota..."
             rows={2}
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
           />
-          <label className="flex items-center gap-2 text-[12px] text-muted">
+          <label className="flex items-center gap-2 text-[12px] text-fg-muted">
             <input type="checkbox" checked={notePinned} onChange={(e) => setNotePinned(e.target.checked)} />
             Fissa in alto
           </label>
@@ -118,11 +118,11 @@ export default function BachecaTab({
         </Button>
       )}
 
-      <div className="border-t border-border-soft pt-3">
+      <div className="border-t border-line pt-3">
         <ChecklistSection roomId={roomId} currentMember={currentMember} members={members} items={roomChecklistItems} />
       </div>
 
-      <p className="pt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Link utili</p>
+      <p className="pt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Link utili</p>
       <div className="space-y-2">
         {boardLinks.map((l) => (
           <a
@@ -133,31 +133,31 @@ export default function BachecaTab({
             className="flex items-center justify-between rounded-2xl bg-surface/60 p-3.5 transition-transform active:scale-[0.98]"
           >
             <div className="flex items-center gap-2.5">
-              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-ink">
-                <Link2 size={13} className="text-teal" />
+              <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-canvas">
+                <Link2 size={13} className="text-accent" />
               </div>
               <div>
-                <p className="text-[13px] text-cream">{l.label}</p>
-                <p className="font-mono text-[10px] text-muted">{l.url}</p>
+                <p className="text-[13px] text-fg">{l.label}</p>
+                <p className="font-mono text-[10px] text-fg-muted">{l.url}</p>
               </div>
             </div>
-            <ChevronRight size={14} className="text-muted" />
+            <ChevronRight size={14} className="text-fg-muted" />
           </a>
         ))}
-        {boardLinks.length === 0 && <p className="text-sm text-muted">Nessun link ancora.</p>}
+        {boardLinks.length === 0 && <p className="text-sm text-fg-muted">Nessun link ancora.</p>}
       </div>
 
       {addingLink ? (
         <form onSubmit={addLink} className="flex flex-col gap-2">
           <input
             autoFocus
-            className="rounded-lg border border-border-soft bg-surface px-3 py-2 text-[13px] text-cream placeholder:text-muted"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted"
             placeholder="Etichetta (es. Biglietti concerto)"
             value={linkLabel}
             onChange={(e) => setLinkLabel(e.target.value)}
           />
           <input
-            className="rounded-lg border border-border-soft bg-surface px-3 py-2 text-[13px] text-cream placeholder:text-muted"
+            className="rounded-lg border border-line bg-surface px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted"
             placeholder="URL"
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}

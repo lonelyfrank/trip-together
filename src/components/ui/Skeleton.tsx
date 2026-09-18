@@ -2,12 +2,12 @@
 // WeatherStrip (animate-pulse), riusato qui per le pagine intere invece del
 // solo testo "Caricamento...". Due toni per restare visibile in entrambi i
 // contesti: `onInk` (default) per i placeholder direttamente sullo sfondo
-// pagina bg-ink, `onSurface` per quelli dentro una card bg-surface (dove
-// bg-ink/60 fa già contrasto, come nel pulse di WeatherStrip).
+// pagina bg-canvas, `onSurface` per quelli dentro una card bg-surface (dove
+// bg-canvas/60 fa già contrasto, come nel pulse di WeatherStrip).
 
 const TONES = {
   onInk: 'bg-surface',
-  onSurface: 'bg-ink/60',
+  onSurface: 'bg-canvas/60',
 } as const
 
 interface SkeletonProps {
@@ -35,7 +35,7 @@ export function SkeletonHeader() {
 /** Placeholder per una riga stile Card con icona + due righe di testo. */
 export function SkeletonCard() {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-border-soft bg-surface/70 p-4">
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface/70 p-4">
       <Skeleton tone="onSurface" className="h-11 w-11 shrink-0 rounded-2xl" />
       <div className="min-w-0 flex-1 space-y-2">
         <Skeleton tone="onSurface" className="h-4 w-2/3" />

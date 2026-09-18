@@ -114,12 +114,12 @@ export default function DestinationCard({ room }: DestinationCardProps) {
   return (
     <Card tone="highlight">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-1.5 text-amber">
+        <div className="flex items-center gap-1.5 text-warn">
           <MapPin size={13} strokeWidth={2.5} />
           <span className="font-mono text-[10px] uppercase tracking-[0.18em]">Destinazione</span>
         </div>
         {!editing && (
-          <button onClick={startEditing} className="font-mono text-[10px] text-muted underline">
+          <button onClick={startEditing} className="font-mono text-[10px] text-fg-muted underline">
             modifica
           </button>
         )}
@@ -129,7 +129,7 @@ export default function DestinationCard({ room }: DestinationCardProps) {
         <form onSubmit={save} className="flex flex-col gap-2.5">
           <input
             autoFocus
-            className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-cream placeholder:text-muted"
+            className="rounded-lg border border-line bg-canvas px-3 py-2 text-fg placeholder:text-fg-muted"
             placeholder="Nome del posto (es. Spiaggia del Faro)"
             value={label}
             onChange={(e) => setLabel(e.target.value)}
@@ -137,24 +137,24 @@ export default function DestinationCard({ room }: DestinationCardProps) {
 
           <div className="flex flex-col gap-1.5">
             <input
-              className="rounded-lg border border-border-soft bg-ink px-3 py-2 text-[13px] text-cream placeholder:text-muted"
+              className="rounded-lg border border-line bg-canvas px-3 py-2 text-[13px] text-fg placeholder:text-fg-muted"
               placeholder="Incolla un link di Google/Apple Maps o coordinate"
               value={linkInput}
               onChange={(e) => applyLink(e.target.value)}
               inputMode="url"
             />
             {linkStatus.kind === 'ok' && (
-              <p className="flex items-center gap-1 font-mono text-[10px] text-teal">
+              <p className="flex items-center gap-1 font-mono text-[10px] text-accent">
                 <Check size={11} /> Posizione trovata: {linkStatus.lat.toFixed(5)}, {linkStatus.lng.toFixed(5)}
               </p>
             )}
             {linkStatus.kind === 'shortlink' && (
-              <p className="font-mono text-[10px] text-amber">
+              <p className="font-mono text-[10px] text-warn">
                 È un link accorciato: aprilo, poi incolla il link completo (o le coordinate).
               </p>
             )}
             {linkStatus.kind === 'error' && (
-              <p className="font-mono text-[10px] text-coral">Link non riconosciuto. Prova con le coordinate "lat, lng".</p>
+              <p className="font-mono text-[10px] text-danger">Link non riconosciuto. Prova con le coordinate "lat, lng".</p>
             )}
           </div>
 
@@ -163,13 +163,13 @@ export default function DestinationCard({ room }: DestinationCardProps) {
           </Button>
 
           {lat !== null && lng !== null && linkStatus.kind === 'idle' && (
-            <p className="font-mono text-[10px] text-muted">
+            <p className="font-mono text-[10px] text-fg-muted">
               Coordinate attuali: {lat.toFixed(5)}, {lng.toFixed(5)}
             </p>
           )}
 
           {saveError && (
-            <p className="rounded-lg bg-coral/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-coral">
+            <p className="rounded-lg bg-danger/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-danger">
               {saveError}
             </p>
           )}
@@ -185,7 +185,7 @@ export default function DestinationCard({ room }: DestinationCardProps) {
         </form>
       ) : room.destination_label || hasCoords ? (
         <>
-          <p className="font-serif text-[19px] leading-snug text-cream">
+          <p className="font-serif text-[19px] leading-snug text-fg">
             {room.destination_label || 'Destinazione senza nome'}
           </p>
           <EventTimeRow room={room} />
@@ -204,7 +204,7 @@ export default function DestinationCard({ room }: DestinationCardProps) {
         </>
       ) : (
         <>
-          <p className="text-[13px] text-muted">Nessuna destinazione impostata ancora.</p>
+          <p className="text-[13px] text-fg-muted">Nessuna destinazione impostata ancora.</p>
           <Button variant="outline" size="sm" className="mt-3" onClick={startEditing}>
             <MapPin size={13} /> Imposta destinazione
           </Button>

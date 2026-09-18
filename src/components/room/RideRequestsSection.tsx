@@ -75,9 +75,9 @@ export default function RideRequestsSection({
     <div className="space-y-2">
       {amUnassigned &&
         (myRequest ? (
-          <div className="flex items-center justify-between rounded-xl border border-teal/25 bg-teal/10 px-3.5 py-2.5">
-            <span className="text-[12px] text-cream">In attesa di un passaggio...</span>
-            <button onClick={cancelRequest} className="font-mono text-[10px] text-muted underline">
+          <div className="flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-3.5 py-2.5">
+            <span className="text-[12px] text-fg">In attesa di un passaggio...</span>
+            <button onClick={cancelRequest} className="font-mono text-[10px] text-fg-muted underline">
               annulla
             </button>
           </div>
@@ -89,17 +89,17 @@ export default function RideRequestsSection({
 
       {othersWaiting.length > 0 && (
         <>
-          <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-muted">Cercano un passaggio</p>
+          <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Cercano un passaggio</p>
           <div className="space-y-1.5">
             {othersWaiting.map((r) => {
               const member = memberById(r.member_id)
               return (
                 <Card key={r.id} tone="dashed" className="flex items-center justify-between !p-3.5">
                   <div className="flex items-center gap-2.5">
-                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-amber text-[11px] font-semibold text-ink">
+                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-warn text-[11px] font-semibold text-on-accent">
                       {member?.display_name[0]?.toUpperCase() ?? '?'}
                     </div>
-                    <span className="text-[13px] text-cream">{member?.display_name ?? '?'}</span>
+                    <span className="text-[13px] text-fg">{member?.display_name ?? '?'}</span>
                   </div>
                   {myCarWithFreeSeat && (
                     <Button size="sm" variant="teal" onClick={() => offerSeat(r)}>

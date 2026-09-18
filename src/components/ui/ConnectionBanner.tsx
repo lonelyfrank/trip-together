@@ -19,7 +19,7 @@ export default function ConnectionBanner() {
   return (
     <div
       role="status"
-      className="sticky inset-x-0 top-0 z-20 mx-auto flex items-center justify-center gap-2 bg-ink-deep px-4 py-2 text-coral"
+      className="sticky inset-x-0 top-0 z-40 mx-auto flex items-center justify-center gap-2 border-b border-danger/25 bg-danger/10 px-4 py-2 text-danger backdrop-blur"
       style={{ animation: 'fade-slide-down 0.22s ease-out' }}
     >
       <WifiOff size={13} />
