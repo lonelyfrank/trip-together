@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { addToQueue, readQueue, removeFromQueue, type QueueItem } from './offlineQueueStore.ts'
 
-const item = (id: string): QueueItem => ({ id, name: 'board_notes.insert', args: [id], label: 'nota' })
+const item = (id: string): QueueItem => ({ id, name: 'board_notes.insert', args: [id], label: 'nota', attempts: 0 })
 
 test('addToQueue: aggiunge un item nuovo in coda', () => {
   const queue = addToQueue([], item('a'))
@@ -48,4 +48,9 @@ test('readQueue: JSON corrotto → [] invece di lanciare', () => {
 test('readQueue: JSON valido ma non un array → []', () => {
   const store = { getItem: () => JSON.stringify({ a: 1 }), setItem: () => {} }
   assert.deepEqual(readQueue(store), [])
+})
+
+test('le code precedenti partono da zero tentativi', () => {
+  const legacy = { id: 'old', name: 'board_notes.insert', args: [], label: 'nota' }
+  assert.equal(readQueue({ getItem: () => JSON.stringify([legacy]), setItem: () => {} })[0].attempts, 0)
 })

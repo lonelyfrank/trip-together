@@ -1,8 +1,9 @@
 import { Check, Circle, Fuel, Package, Plus } from 'lucide-react'
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useEffect, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
+import { isProposalVisible, PROPOSAL_RETENTION_MS } from '../../lib/proposals'
 import { formatMoney } from '../../lib/format'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { mutateNotify } from '../../lib/db'
@@ -57,6 +58,16 @@ export default function AutoTab({
   stopProposalVotes,
   rideRequests,
 }: AutoTabProps) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    // Un solo timeout rimuove le proposte alla scadenza della finestra, anche
+    // quando tutte le schede concluse hanno già spento il proprio intervallo.
+    const current = Date.now()
+    const next = Math.min(...stopProposals.map((p) => Date.parse(p.expires_at) + PROPOSAL_RETENTION_MS).filter((time) => time > current))
+    if (!Number.isFinite(next)) return
+    const timer = setTimeout(() => setNow(Date.now()), Math.min(next - current + 1, 2_147_483_647))
+    return () => clearTimeout(timer)
+  }, [stopProposals, now])
   const [addingCar, setAddingCar] = useState(false)
   const [seats, setSeats] = useState('4')
   const [savingCar, setSavingCar] = useState(false)
@@ -121,7 +132,8 @@ export default function AutoTab({
     await mutateNotify('car_passengers.assign', insertCarPassenger(carId, memberId), 'Assegnazione non riuscita.')
   }
 
-  const roomWideProposals = stopProposals.filter((p) => p.car_id === null)
+  const visibleProposals = stopProposals.filter((p) => isProposalVisible(p, stopProposalVotes.filter((v) => v.proposal_id === p.id), members.length, Math.max(now, Date.now())))
+  const roomWideProposals = visibleProposals.filter((p) => p.car_id === null)
 
   return (
     <div className="space-y-3 px-4 pb-28 sm:px-6">
@@ -178,7 +190,7 @@ export default function AutoTab({
         const iAmInThisCar = currentCarId === car.id
 
         const activeDelay = delayReports.find((d) => d.car_id === car.id && !d.resolved_at)
-        const carProposals = stopProposals.filter((p) => p.car_id === car.id)
+        const carProposals = visibleProposals.filter((p) => p.car_id === car.id)
         // Ritardo e proposte-sosta hanno senso solo mentre l'auto è in viaggio (o se
         // c'è già un ritardo aperto da prima): stessa condizione, un solo posto dove
         // deciderla, invece di ripeterla su ogni sotto-blocco.

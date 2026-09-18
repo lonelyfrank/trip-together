@@ -140,11 +140,31 @@ try {
   report('browser: bacheca aggiornata via INSERT/UPDATE/DELETE da un altro device')
 
 
+  const otherMember = await rpc(recovery, 'join_room', { p_room_id: room.id, p_invite_code: room.invite_code, p_display_name: 'Verifica concorrenza' })
+  const carId = crypto.randomUUID()
+  await checked(owner.from('cars').insert({ id: carId, room_id: room.id, driver_member_id: room.member_id, seats_total: 2 }))
+  const competing = await Promise.all([
+    visitor.from('car_passengers').upsert({ car_id: carId, member_id: guestMember }, { onConflict: 'member_id' }),
+    recovery.from('car_passengers').upsert({ car_id: carId, member_id: otherMember }, { onConflict: 'member_id' }),
+  ])
+  assert.equal(competing.filter((result) => !result.error).length, 1)
+  assert.equal(competing.filter((result) => result.error?.code === '23514').length, 1)
+  const assigned = await checked(owner.from('car_passengers').select('member_id').eq('car_id', carId))
+  assert.equal(assigned.length, 1)
+  await checked(owner.from('car_passengers').upsert({ car_id: carId, member_id: assigned[0].member_id }, { onConflict: 'member_id' }))
+  assert.equal((await owner.from('cars').update({ seats_total: 1 }).eq('id', carId)).error?.code, '23514')
+  assert.equal((await owner.from('cars').update({ driver_member_id: null }).eq('id', carId)).error?.code, '23502')
+  assert((await owner.from('stop_proposals').select('status').limit(0)).error)
+  await checked(owner.from('cars').delete().eq('id', carId))
+  report('fase 4: due richieste concorrenti per un posto, una sola riesce; retry idempotente, capienza e NOT NULL rispettati, status sosta rimosso')
+
   const recovered = await pageFor(recovery)
   const token = Buffer.from(JSON.stringify({ roomId: room.id, memberId: room.member_id, inviteCode: room.invite_code })).toString('base64url')
   await recovered.page.goto(`${base}/resume/${token}`)
   await recovered.page.getByRole('heading', { name: 'Ci sei anche tu?' }).waitFor()
+  const confirmedResponse = recovered.page.waitForResponse((response) => response.url().includes('/rest/v1/members') && response.request().method() === 'PATCH')
   await recovered.page.getByRole('button', { name: 'Conferma la tua presenza', exact: true }).click()
+  assert((await confirmedResponse).ok())
   await recovered.page.getByRole('heading', { name: 'Troviamo il tuo passaggio' }).waitFor()
   assert.equal((await checked(owner.from('members').select('confirmed').eq('id', room.member_id).single())).confirmed, true)
   assert.equal(await rpc(recovery, 'claim_member', { p_room_id: room.id, p_member_id: room.member_id, p_invite_code: room.invite_code }), 'Verifica creatore')
@@ -161,7 +181,7 @@ try {
 } finally {
   if (browser) await browser.close()
   if (room) {
-    for (const table of ['board_notes', 'radar_positions', 'general_expenses']) await checked(owner.from(table).delete().eq('room_id', room.id))
+    for (const table of ['board_notes', 'radar_positions', 'general_expenses', 'cars']) await checked(owner.from(table).delete().eq('room_id', room.id))
     await checked(owner.from('rooms').update({ status: 'closed' }).eq('id', room.id))
     console.log('CLEANUP dati temporanei rimossi; evento di verifica archiviato nella comitiva isolata.')
   }

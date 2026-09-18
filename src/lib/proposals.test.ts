@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { computeOutcome } from './proposals.ts'
+import { computeOutcome, isProposalVisible, PROPOSAL_RETENTION_MS } from './proposals.ts'
 import type { StopProposal, StopProposalVote } from '../types'
 
 const future = new Date(Date.now() + 10 * 60_000).toISOString()
@@ -14,7 +14,6 @@ function proposal(expires: string): StopProposal {
     proposed_by: 'm1',
     type: 'benzina',
     note: null,
-    status: 'pending',
     created_at: new Date(Date.now() - 60_000).toISOString(),
     expires_at: expires,
   }
@@ -41,4 +40,11 @@ test('computeOutcome: pochi voti + non scaduta → pending', () => {
 
 test('computeOutcome: scaduta senza maggioranza → expired', () => {
   assert.equal(computeOutcome(proposal(past), [vote('a', 'yes')], 4), 'expired')
+})
+
+test('una sosta conclusa sparisce dopo 15 minuti dalla scadenza', () => {
+  const p = proposal(past), end = Date.parse(p.expires_at) + PROPOSAL_RETENTION_MS
+  assert.equal(isProposalVisible(p, [], 3, end - 1), true)
+  assert.equal(isProposalVisible(p, [], 3, end), false)
+  assert.equal(isProposalVisible(p, [vote('a', 'yes'), vote('b', 'yes')], 3, end), false)
 })

@@ -154,6 +154,42 @@ Fase 2: commit `dfd99ce` (`correggi orari ordine delle liste e quote duplicate`)
   richieste Home esclude le sonde di checkSchema, presenti solo in DEV.
 - Nessuno SQL aggiuntivo e nessuna dipendenza aggiunta.
 
-## Fasi successive
+## Fase 4 — completata dopo conferma SQL
 
-Fasi 4–5: da implementare, con conferma dello SQL di fase 4 prima del client dipendente.
+Fase 3: commit `213b0ec` (`riduci polling e query inutili e conserva il meteo in cache`).
+L'utente ha confermato il blocco dei riferimenti/capienza con «fatto».
+
+- Coda con attempts persistente e migrazione del formato precedente. Errori di
+  rete/timeout/5xx e sovraccarico temporaneo mantengono l'item; errori permanenti e
+  operazioni non più registrate lo scartano e proseguono. Massimo 5 invii; toast
+  con il numero di modifiche perse e riconciliazione della cache.
+- Rollback derivato per chiave e campi modificati: conserva altre righe,
+  collezioni e aggiornamenti concorrenti, anche sulla stessa riga. Riconciliazione
+  server su errore per gestire le cancellazioni della medesima entità.
+- mutate restituisce queued; feedback centralizzato per tutte le scritture
+  accodate. Entrambi i punti di conferma presenza usano la patch ottimistica.
+- Codici client CSPRNG a 7 caratteri con maschera/rejection sampling; il percorso
+  produttivo usa già la RPC atomica con retry collisioni. Codici vecchi accettati.
+- Soste client-only: status eliminato dal tipo, schede concluse senza intervalli,
+  rimozione dopo expires_at + 15 minuti anche senza altri eventi (un timeout nel
+  contenitore). Nessun cron o persistenza di un esito che può diventare obsoleto.
+- NOT NULL applicati. Backfill da riferimenti univoci e stop transazionale per
+  righe non ricostruibili; nessuna cancellazione né capienza inventata.
+- Trigger capienza con lock della riga auto; protezione anche contro la riduzione
+  dei posti sotto le assegnazioni. Messaggio specifico in UI sul posto esaurito.
+- `npm run check && npm test && npm run build`: superato (13 file di test).
+- Smoke browser: presenza offline immediata, nota accodata con feedback,
+  operazione irrecuperabile segnalata e coda che riparte; regressioni precedenti OK.
+- Prova reale: due sessioni richiedono contemporaneamente l'ultimo posto; una
+  riesce, l'altra riceve 23514. Un solo passeggero; retry dello stesso membro
+  riuscito; riduzione capienza e driver nullo respinti. Colonna status rimossa.
+- RLS, invito, recupero e INSERT/UPDATE/DELETE realtime nuovamente verificati,
+  incluse le modifiche visibili in bacheca. Fixture isolate ripulite; evento
+  archiviato e anagrafiche di test conservate come nelle verifiche precedenti.
+
+Nessun DDL eseguito dall'agente. Rieseguibilità SQL revisionata staticamente,
+non provata tramite due applicazioni autonome (vietate dal piano).
+
+## Fase 5 — da completare
+
+PWA, integrazione smoke UI in package/CI e allineamento dei messaggi operativi.

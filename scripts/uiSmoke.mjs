@@ -175,5 +175,32 @@ try {
     console.log('PASS meteo riutilizzato dopo tre cambi tab; Home senza query spese/radar inutilizzate');
     await ctx.close();
   }
+  {
+    const {ctx,page,state}=await context(true);
+    await page.goto(`${base}/room/${roomId}`);await page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});window.dispatchEvent(new Event('offline'))});
+    await page.getByRole('button',{name:'Conferma la tua presenza',exact:true}).click();
+    await page.getByRole('heading',{name:'Troviamo il tuo passaggio'}).waitFor();
+    await page.getByText('Salveremo la modifica al ritorno online',{exact:true}).waitFor();
+    assert.equal(state.tables.members[0].confirmed,false);
+    await page.getByRole('button',{name:'Bacheca',exact:true}).click();
+    await page.getByRole('button',{name:'Aggiungi nota',exact:true}).click();
+    await page.getByPlaceholder('Scrivi una nota...').fill('Nota offline');
+    await page.getByRole('button',{name:'Aggiungi',exact:true}).click();
+    await page.getByPlaceholder('Scrivi una nota...').waitFor({state:'detached'});
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('tt:offline-queue')).length),2);
+    await page.evaluate(()=>{
+      const queue=JSON.parse(localStorage.getItem('tt:offline-queue'));
+      queue.unshift({id:'poison',name:'op-rimossa',args:[],label:'vecchia modifica',attempts:0});
+      localStorage.setItem('tt:offline-queue',JSON.stringify(queue));
+      Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>true});window.dispatchEvent(new Event('online'));
+    });
+    await page.getByText('Una modifica non salvata è stata persa. Ricontrolla i dati dell’evento.',{exact:true}).waitFor();
+    await page.getByText('Nota offline',{exact:true}).waitFor();
+    assert.equal(state.tables.members[0].confirmed,true);
+    assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('tt:offline-queue')).length),0);
+    console.log('PASS conferma presenza e nota offline con feedback; operazione irrecuperabile scartata con avviso e coda sbloccata');
+    await ctx.close();
+  }
   assert.deepEqual(errors,[]);console.log('PASS nessun errore JavaScript');
 } finally {await browser.close()}

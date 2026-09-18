@@ -7,6 +7,7 @@ import {
   type QueueItem,
 } from './offlineQueueStore'
 import { showToast } from './toast'
+import { queryClient } from './queryClient'
 import { drainQueue } from './drainQueue'
 
 // Coda offline persistente: le mutazioni fatte senza connessione vengono
@@ -44,7 +45,7 @@ export function getQueueSize(): number {
 }
 
 export function enqueueOp(op: Op<unknown>, label: string): void {
-  const item: QueueItem = { id: crypto.randomUUID(), name: op.name, args: op.args, label }
+  const item: QueueItem = { id: crypto.randomUUID(), name: op.name, args: op.args, label, attempts: 0 }
   writeQueue(addToQueue(readQueue(), item))
   emit()
 }
@@ -56,11 +57,13 @@ export async function flushQueue(): Promise<void> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) return
   flushing = true
   try {
-    const { count, failed } = await drainQueue(storage, (item) => {
+    const { count, discarded, failed } = await drainQueue(storage, (item) => {
       const factory = getOpRegistry()[item.name]
-      return factory ? factory(...item.args).run() : Promise.resolve({ error: 'Operazione non disponibile' })
+      return factory ? factory(...item.args).run() : Promise.resolve({ error: { code: 'OP_NOT_FOUND', message: 'Operazione non disponibile' } })
     }, emit, () => typeof navigator === 'undefined' || navigator.onLine)
     if (failed) showToast('Alcune modifiche sono ancora in attesa. Riprova la sincronizzazione.', 'error')
+    if (discarded > 0) showToast(`${discarded === 1 ? "Una modifica non salvata è stata persa" : `${discarded} modifiche non salvate sono state perse`}. Ricontrolla i dati dell’evento.`, 'error')
+    if (count > 0 || discarded > 0) void queryClient.invalidateQueries({ queryKey: ['room-data'] })
     if (count > 0) showToast(`${count} modifiche sincronizzate.`, 'success')
   } finally {
     flushing = false

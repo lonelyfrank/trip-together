@@ -1,4 +1,4 @@
-import type { PostgrestError } from '@supabase/supabase-js'
+import { PostgrestError } from '@supabase/supabase-js'
 import type { Op } from './mutations/room'
 import { isOnline } from './online'
 import { enqueueOp } from './offlineQueue'
@@ -49,7 +49,7 @@ export function firstError(...qs: Query<unknown>[]): PostgrestError | null {
 
 // Wrapper unico per le scritture (insert/update/delete/upsert): centralizza le
 // mutazioni e garantisce che un errore non sia mai silenzioso (log con
-// "tabella.operazione"). Ritorna { data, error } così chi crea una riga può
+// "tabella.operazione"). Ritorna { data, error, queued } così chi crea una riga può
 // leggerne il risultato. Se si è offline, l'Op viene accodato (vedi
 // src/lib/offlineQueue.ts) invece di tentare una fetch destinata a fallire, e
 // la scrittura torna "riuscita" (error: null, data: null) perché è solo
@@ -58,14 +58,21 @@ export function firstError(...qs: Query<unknown>[]): PostgrestError | null {
 export async function mutate<T = null>(
   label: string,
   op: Op<T>,
-): Promise<{ data: T | null; error: PostgrestError | null }> {
+): Promise<{ data: T | null; error: PostgrestError | null; queued: boolean }> {
   if (!isOnline() && op.queueable !== false) {
     enqueueOp(op, label)
-    return { data: null, error: null }
+    showToast('Salveremo la modifica al ritorno online', 'info')
+    return { data: null, error: null, queued: true }
   }
-  const res = await op.run()
-  if (res.error) console.error(`[db] ${label} — ${res.error.message}`)
-  return { data: res.data ?? null, error: res.error }
+  try {
+    const res = await op.run()
+    if (res.error) console.error(`[db] ${label} — ${res.error.message}`)
+    return { data: res.data ?? null, error: res.error, queued: false }
+  } catch (cause) {
+    console.error(`[db] ${label}`, cause)
+    const error = new PostgrestError({ message: 'Connessione non disponibile. Riprova.', code: '', details: '', hint: '' })
+    return { data: null, error, queued: false }
+  }
 }
 
 /**
@@ -77,8 +84,8 @@ export async function mutateNotify<T = null>(
   label: string,
   op: Op<T>,
   errorMessage = 'Operazione non riuscita.',
-): Promise<{ data: T | null; error: PostgrestError | null }> {
+): Promise<{ data: T | null; error: PostgrestError | null; queued: boolean }> {
   const res = await mutate(label, op)
-  if (res.error) showToast(errorMessage, 'error')
+  if (res.error) showToast(res.error.code === '23514' && res.error.message === 'Quel posto è stato preso un istante prima.' ? res.error.message : errorMessage, 'error')
   return res
 }

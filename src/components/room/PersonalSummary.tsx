@@ -1,9 +1,7 @@
 import { ArrowRight, Car as CarIcon, Check, Receipt } from 'lucide-react'
 import { useState } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
-import { roomDataKey } from '../../hooks/useRoomData'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { computeBalances } from '../../lib/balances'
-import { mutateNotify } from '../../lib/db'
 import { formatMoney } from '../../lib/format'
 import { confirmMemberPresence } from '../../lib/mutations'
 import { roomPhase } from '../../lib/phase'
@@ -29,7 +27,7 @@ interface Props {
 export default function PersonalSummary(props: Props) {
   const { room, currentMember, members, cars, carPassengers, dataIncomplete, onGoToAuto, onGoToSpese } = props
   const [saving, setSaving] = useState(false)
-  const queryClient = useQueryClient()
+  const optimistic = useRoomOptimistic(room.id)
   const myCar = cars.find((car) => car.driver_member_id === currentMember.id || carPassengers.some((p) => p.car_id === car.id && p.member_id === currentMember.id))
   const phase = roomPhase(room.status, cars.map((car) => car.travel_status))
   const driver = members.find((member) => member.id === myCar?.driver_member_id)
@@ -42,9 +40,9 @@ export default function PersonalSummary(props: Props) {
     if (saving) return
     setSaving(true)
     try {
-      const { error } = await mutateNotify('members.confirmPresence', confirmMemberPresence(currentMember.id), 'Conferma non salvata. Riprova.')
-      if (error) return
-      await queryClient.invalidateQueries({ queryKey: roomDataKey(room.id) })
+      await optimistic('members.confirmPresence', (prev) => ({ ...prev,
+        members: prev.members.map((m) => m.id === currentMember.id ? { ...m, confirmed: true, confirmed_at: new Date().toISOString() } : m),
+      }), () => confirmMemberPresence(currentMember.id), 'Conferma non salvata. Riprova.')
     } catch { showToast('Conferma non salvata. Controlla la connessione.', 'error') }
     finally { setSaving(false) }
   }

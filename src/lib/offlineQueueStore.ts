@@ -9,6 +9,7 @@ export interface QueueItem {
   name: string
   args: unknown[]
   label: string
+  attempts: number
 }
 
 type Store = Pick<Storage, 'getItem' | 'setItem'>
@@ -28,7 +29,11 @@ export function readQueue(store: Store): QueueItem[] {
   if (!raw) return []
   try {
     const parsed: unknown = JSON.parse(raw)
-    return Array.isArray(parsed) ? (parsed as QueueItem[]) : []
+    return Array.isArray(parsed) ? (parsed as QueueItem[]).map((item) => ({
+      ...item,
+      // Le code salvate dalle versioni precedenti non hanno il contatore.
+      attempts: Number.isInteger(item.attempts) && item.attempts >= 0 ? item.attempts : 0,
+    })) : []
   } catch {
     return []
   }

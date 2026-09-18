@@ -2,7 +2,7 @@ import { AlertTriangle, Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
-import { mutate } from '../../lib/db'
+import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { confirmMemberPresence } from '../../lib/mutations'
 import { readinessWindow } from '../../lib/readiness'
 import type { Car, CarPassenger, Member, Room } from '../../types'
@@ -17,6 +17,7 @@ interface ReadinessBannerProps {
 }
 
 export default function ReadinessBanner({ room, currentMember, members, cars, carPassengers, onGoToAuto }: ReadinessBannerProps) {
+  const optimistic = useRoomOptimistic(room.id)
   const [, setTick] = useState(0)
 
   useEffect(() => {
@@ -33,7 +34,9 @@ export default function ReadinessBanner({ room, currentMember, members, cars, ca
   const amIWithoutCar = !assignedIds.has(currentMember.id)
 
   async function confirmPresence() {
-    await mutate('members.confirmPresence', confirmMemberPresence(currentMember.id))
+    await optimistic('members.confirmPresence', (prev) => ({ ...prev,
+      members: prev.members.map((m) => m.id === currentMember.id ? { ...m, confirmed: true, confirmed_at: new Date().toISOString() } : m),
+    }), () => confirmMemberPresence(currentMember.id), 'Conferma non salvata. Riprova.')
   }
 
   return (

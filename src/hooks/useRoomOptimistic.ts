@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query'
+import { createOptimisticRollback } from '../lib/optimisticRollback'
 import { mutate } from '../lib/db'
 import type { Op } from '../lib/mutations/room'
 import { showToast } from '../lib/toast'
@@ -6,7 +7,7 @@ import { roomDataKey, type RoomPayload } from './useRoomData'
 
 /**
  * Mutazione ottimistica sulla cache della stanza: applica subito l'effetto in
- * cache, esegue la scrittura, e su errore fa rollback allo snapshot precedente
+ * cache, esegue la scrittura, e su errore inverte solo le righe/campi modificati
  * mostrando un toast con "Riprova". Al successo, la patch realtime (STEP 3b)
  * riconcilia lo stato reale. Se offline, `mutate` accoda l'Op (STEP 4c) e
  * torna senza errore: l'aggiornamento ottimistico resta applicato finché la
@@ -27,11 +28,15 @@ export function useRoomOptimistic(roomId: string) {
     await queryClient.cancelQueries({ queryKey: key })
     const snapshot = queryClient.getQueryData<RoomPayload>(key)
 
-    queryClient.setQueryData<RoomPayload>(key, (prev) => (prev ? apply(prev) : prev))
+    const applied = snapshot ? apply(snapshot) : undefined
+    const revert = snapshot && applied ? createOptimisticRollback(snapshot, applied) : null
+    queryClient.setQueryData(key, applied)
 
     const { error } = await mutate(label, make())
     if (error) {
-      queryClient.setQueryData(key, snapshot) // rollback
+      queryClient.setQueryData<RoomPayload>(key, (current) => current && revert ? revert(current) : current)
+      // Riconcilia anche eventuali cancellazioni concorrenti della stessa riga.
+      void queryClient.invalidateQueries({ queryKey: key })
       showToast(errorMessage, 'error', {
         label: 'Riprova',
         onClick: () => optimistic(label, apply, make, errorMessage),

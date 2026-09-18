@@ -32,14 +32,15 @@ export default function StopProposalCard({ proposal, votes, eligibleMembers, cur
   const [, setTick] = useState(0)
   const optimistic = useRoomOptimistic(proposal.room_id)
 
+  const outcome = computeOutcome(proposal, votes, eligibleMembers.length)
   useEffect(() => {
+    if (outcome !== 'pending') return
     const id = setInterval(() => setTick((t) => t + 1), 3000)
     return () => clearInterval(id)
-  }, [])
+  }, [outcome])
 
   const meta = TYPE_META[proposal.type]
   const Icon = meta.icon
-  const outcome = computeOutcome(proposal, votes, eligibleMembers.length)
   const outcomeMeta = OUTCOME_META[outcome]
   const fraction = remainingFraction(proposal, Date.now())
   const yes = votes.filter((v) => v.vote === 'yes').length

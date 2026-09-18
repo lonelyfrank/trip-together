@@ -134,7 +134,6 @@ export interface RadarPosition {
 }
 
 export type StopProposalType = 'benzina' | 'cibo_bagno' | 'attesa' | 'altro'
-export type StopProposalStatus = 'pending' | 'accepted' | 'rejected' | 'expired'
 
 export interface StopProposal {
   id: string
@@ -143,7 +142,6 @@ export interface StopProposal {
   proposed_by: string
   type: StopProposalType
   note: string | null
-  status: StopProposalStatus
   created_at: string
   expires_at: string
 }

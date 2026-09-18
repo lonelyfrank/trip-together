@@ -732,3 +732,148 @@ create unique index if not exists idx_general_expense_participants_unique
 
 notify pgrst, 'reload schema';
 commit;
+
+-- ═══ Fix: riferimenti obbligatori, capienza auto e soste client-only ═══
+begin;
+
+lock table public.members, public.cars, public.car_passengers,
+  public.board_notes, public.board_links, public.radar_positions
+  in share row exclusive mode;
+
+-- Ricostruisce solo appartenenze sostenute da riferimenti esistenti.
+update public.cars c set room_id = m.room_id
+from public.members m
+where c.driver_member_id = m.id and c.room_id is null and m.room_id is not null;
+
+with candidati as (
+  select driver_member_id as member_id, room_id from public.cars
+  union
+  select cp.member_id, c.room_id from public.car_passengers cp
+    join public.cars c on c.id = cp.car_id
+  union
+  select member_id, room_id from public.radar_positions
+  union
+  select paid_by_member_id, room_id from public.general_expenses
+), univoci as (
+  select member_id, min(room_id::text)::uuid as room_id
+  from candidati where member_id is not null and room_id is not null
+  group by member_id having count(distinct room_id) = 1
+)
+update public.members m set room_id = u.room_id
+from univoci u where m.id = u.member_id and m.room_id is null;
+
+update public.cars c set room_id = m.room_id
+from public.members m
+where c.driver_member_id = m.id and c.room_id is null and m.room_id is not null;
+
+update public.radar_positions r set room_id = m.room_id
+from public.members m
+where r.member_id = m.id and r.room_id is null and m.room_id is not null;
+
+-- Anche i figli tornano nello stesso ambito RLS dell'auto ricostruita.
+do $$
+declare t text;
+begin
+  foreach t in array array['car_passengers', 'car_expenses', 'car_cargo', 'delay_reports'] loop
+    execute format('update public.%I child set room_id = c.room_id from public.cars c
+      where child.car_id = c.id and c.room_id is not null
+        and child.room_id is distinct from c.room_id', t);
+  end loop;
+end $$;
+
+-- Senza autore o altro riferimento non si può indovinare l'evento/membro.
+-- In quel caso annulla il blocco: nessuna cancellazione e nessun dato inventato.
+do $$
+declare r record; v_count bigint; v_missing text := '';
+begin
+  for r in select * from (values
+    ('members', 'room_id'), ('cars', 'room_id'),
+    ('cars', 'driver_member_id'), ('car_passengers', 'car_id'),
+    ('car_passengers', 'member_id'), ('board_notes', 'room_id'),
+    ('board_links', 'room_id'), ('radar_positions', 'room_id')
+  ) as columns_to_check(table_name, column_name) loop
+    execute format('select count(*) from public.%I where %I is null',
+      r.table_name, r.column_name) into v_count;
+    if v_count > 0 then
+      v_missing := v_missing || format('%s.%s: %s; ', r.table_name, r.column_name, v_count);
+    end if;
+  end loop;
+  if v_missing <> '' then
+    raise exception 'Riferimenti non ricostruibili: %', v_missing
+      using errcode = '23502', hint = 'Correggi i riferimenti segnalati e riesegui il blocco. Nessuna riga è stata cancellata.';
+  end if;
+end $$;
+
+alter table public.members alter column room_id set not null;
+alter table public.cars
+  alter column room_id set not null,
+  alter column driver_member_id set not null;
+alter table public.car_passengers
+  alter column car_id set not null,
+  alter column member_id set not null;
+alter table public.board_notes alter column room_id set not null;
+alter table public.board_links alter column room_id set not null;
+alter table public.radar_positions alter column room_id set not null;
+
+-- Non aumentare la capienza dichiarata per nascondere un overbooking pregresso.
+do $$
+begin
+  if exists (
+    select 1 from public.cars c
+    where c.seats_total < 1 or (select count(*) from public.car_passengers cp
+      where cp.car_id = c.id) > c.seats_total - 1
+  ) then
+    raise exception 'Ci sono auto con capienza non valida o già sovraccariche.'
+      using errcode = '23514', hint = 'Correggi posti e assegnazioni effettivi prima di rieseguire il blocco.';
+  end if;
+  if not exists (select 1 from pg_constraint
+    where conrelid = 'public.cars'::regclass and conname = 'cars_seats_total_positive') then
+    alter table public.cars add constraint cars_seats_total_positive check (seats_total >= 1);
+  end if;
+end $$;
+
+create or replace function public.enforce_car_passenger_capacity()
+returns trigger language plpgsql set search_path = public as $$
+declare v_seats int; v_passengers bigint;
+begin
+  -- Lo stesso lock serializza ingressi concorrenti e modifiche alla capienza.
+  select seats_total into v_seats from public.cars where id = new.car_id for update;
+  if not found then
+    raise exception 'Auto non disponibile.' using errcode = '42501';
+  end if;
+  select count(*) into v_passengers from public.car_passengers
+    where car_id = new.car_id
+      and id is distinct from new.id
+      and member_id is distinct from new.member_id;
+  if v_passengers >= v_seats - 1 then
+    raise exception 'Quel posto è stato preso un istante prima.' using errcode = '23514';
+  end if;
+  return new;
+end $$;
+
+create or replace function public.enforce_car_seats_update()
+returns trigger language plpgsql set search_path = public as $$
+begin
+  -- UPDATE ha già bloccato la riga dell'auto: non si può abbassare il limite
+  -- sotto le assegnazioni esistenti mentre un passeggero sta entrando.
+  if (select count(*) from public.car_passengers where car_id = new.id) > new.seats_total - 1 then
+    raise exception 'La capienza è inferiore ai posti già assegnati.' using errcode = '23514';
+  end if;
+  return new;
+end $$;
+
+revoke execute on function public.enforce_car_passenger_capacity() from public, anon, authenticated;
+revoke execute on function public.enforce_car_seats_update() from public, anon, authenticated;
+
+drop trigger if exists trg_car_passengers_capacity on public.car_passengers;
+create trigger trg_car_passengers_capacity before insert or update on public.car_passengers
+  for each row execute function public.enforce_car_passenger_capacity();
+drop trigger if exists trg_cars_seats_capacity on public.cars;
+create trigger trg_cars_seats_capacity before update of seats_total on public.cars
+  for each row execute function public.enforce_car_seats_update();
+
+-- L'esito resta derivato da voti/scadenza sul client; nessuno status persistito obsoleto.
+alter table public.stop_proposals drop column if exists status;
+
+notify pgrst, 'reload schema';
+commit;
