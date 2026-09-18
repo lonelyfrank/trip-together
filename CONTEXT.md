@@ -1,8 +1,12 @@
 # Trip Together — contesto per sviluppo
 
-Stato aggiornato al **18 settembre 2026**, commit `9623cf7`. Questo file è la memoria
+Stato aggiornato al **18 settembre 2026**, commit `ff2cf04`. Questo file è la memoria
 di progetto: cos'è l'app, com'è fatta, cosa fa e dove siamo arrivati. Per il setup
 locale vedi [README.md](README.md).
+
+> **Refactor UI in corso.** Le sezioni §4, §8 e §9 descrivono la nuova
+> architettura (tema doppio, navigazione a cinque sezioni) già in `main`.
+> Le composizioni delle singole viste sono ancora in lavorazione: vedi §10.
 
 ---
 
@@ -51,7 +55,7 @@ un'identità persa — è coperto dai link di recupero (§6).
 | UI | **React 19** | `StrictMode`, pagine in `lazy()` + `Suspense` |
 | Routing | **react-router-dom 7** | `BrowserRouter` |
 | Stato server | **TanStack Query 5** | cache unica condivisa fra Home, Crew e Room |
-| Stile | **Tailwind CSS 4** via `@tailwindcss/vite` | token in `@theme`, nessun file di config JS |
+| Stile | **Tailwind CSS 4** via `@tailwindcss/vite` | token semantici in `@theme inline`, due temi (§8), nessun file di config JS |
 | Icone | **lucide-react** | |
 | Backend | **Supabase** | Postgres + PostgREST + Realtime + Auth anonima |
 | PWA | **vite-plugin-pwa 1.3** (Workbox) | `registerType: 'prompt'`, precache dello shell |
@@ -66,8 +70,10 @@ serve è scritto in `src/lib` e `src/components/ui`. ~6.400 righe di TS/TSX.
 `npm run build` · `npm run db:check` (tabelle attese presenti sul DB) ·
 `npm run test:ui` · `npm run test:pwa`.
 
-**Bundle di produzione:** entry ~198 kB (63 kB gzip), chunk Supabase ~281 kB
-(77 kB gzip, caricato a parte), chunk Room ~82 kB. Precache PWA: 20 file, ~630 kB.
+**Bundle di produzione:** entry ~431 kB (124 kB gzip), più i chunk per sezione
+(Trip ~31 kB, Group ~28 kB, RoomShell ~12 kB). Precache PWA: 46 file, ~666 kB.
+Nota: con le sezioni in route separate lo split è cambiato e l'entry ha assorbito
+il chunk Supabase — da rivedere quando le viste sono definitive.
 
 ---
 
@@ -89,13 +95,27 @@ pagine non duplicano questa logica.
 
 ---
 
-## 4. Le funzioni, tab per tab
+## 4. Le funzioni, sezione per sezione
 
-La stanza ha cinque tab (`TabBar`, tab persistente nella query string `?tab=`).
+La navigazione è a livello di applicazione (`BottomNavigation`): quattro sezioni
+della stanza — **Adesso**, **Viaggio**, **Attività**, **Gruppo** — più **Profilo**,
+che vive fuori dalla stanza. Su mobile è una barra in basso con safe-area, da
+768px una colonna laterale da 220px.
+
+`RoomShell` (`src/pages/room/RoomShell.tsx`) è la shell: tiene il gate di
+appartenenza, gli stati di errore/invito/archivio, l'header e la navigazione, legge
+la stanza **una volta** e la passa alle sezioni via Outlet context
+(`useRoomContext`). Se ogni sezione chiamasse `useRoomData` aprirebbe un secondo
+canale realtime sulla stessa stanza.
+
 Il cruscotto è **adattivo per fase** (`src/lib/phase.ts`): `pre` (nessuna auto
 partita) → `in_corso` (almeno un'auto partita) → `concluso` (stanza archiviata).
 
-### Evento (`StanzaTab`)
+### Adesso (`pages/room/Now.tsx`)
+Home operativa: avvisi (dati incompleti, ritardi aperti), `PersonalSummary`,
+`ReadinessBanner`, stato del gruppo con avatar, destinazione e meteo.
+
+### Componenti di dominio riusati nelle sezioni
 - **`PersonalSummary`** — cosa riguarda *te* adesso: la tua auto, il tuo saldo,
   l'azione che manca. Cambia con la fase.
 - **`DestinationCard`** — destinazione con parsing di ciò che l'utente incolla
@@ -118,7 +138,8 @@ partita) → `in_corso` (almeno un'auto partita) → `concluso` (stanza archivia
 - **`CloseRoomSection`** — archiviazione, solo per il creatore e solo a saldi
   chiusi. Lo storico resta consultabile; solo le posizioni radar vengono pulite.
 
-### Auto (`AutoTab`)
+### Viaggio (`pages/room/Trip.tsx`)
+Punto di ritrovo (`DestinationCard`) e logistica auto (`AutoTab`).
 - Dichiarazione della propria auto con i posti totali (il conducente occupa già
   un posto). La propria auto è sempre in cima ed evidenziata.
 - **Posti**: prendere/lasciare un posto, assegnare a mano chi è senza auto. La
@@ -137,12 +158,21 @@ partita) → `in_corso` (almeno un'auto partita) → `concluso` (stanza archivia
   posto libero lo offre in un gesto (assegna il posto e registra il match).
 - **Carico per auto** — checklist di cosa è già in macchina, per singola auto.
 
-### Bacheca (`BachecaTab`)
+### Attività (`pages/room/Activities.tsx`)
+Itinerario giorno per giorno. **Non ha ancora un modello dati**: la sezione
+dichiara cosa manca invece di mostrare dati finti (vedi §10).
+
+### Gruppo (`pages/room/Group.tsx`)
+Membri (`MembersSection`), spese (`SpeseTab`), compiti e messaggi
+(`BachecaTab`), posizione (`RadarTab`), impostazioni evento
+(`CloseRoomSection`).
+
+#### Bacheca (`BachecaTab`)
 Note brevi (con "fissa in alto"), link utili con etichetta, e **`ChecklistSection`**:
 cosa porta il gruppo, con autoassegnazione e spunta consentita all'assegnatario o
 al creatore.
 
-### Spese (`SpeseTab`)
+#### Spese (`SpeseTab`)
 - Il **tuo saldo** in evidenza, poi il totale evento, i totali per auto e le spese
   di gruppo.
 - Spese generali con **partecipanti selezionabili** (chi divide quella spesa) e chi
@@ -155,7 +185,7 @@ al creatore.
   un'auto assente) l'app **lo dichiara** invece di mostrare un saldo plausibile ma
   falso, e blocca l'archiviazione.
 
-### Radar (`RadarTab`)
+#### Radar (`RadarTab`)
 Posizione condivisa **solo su attivazione esplicita**, rappresentata come radar
 polare con anelli per fascia di distanza (100/300/800 m), bearing e distanza
 formattata. Intervallo adattivo alla distanza dal ritrovo
@@ -164,6 +194,10 @@ storicizzate: una riga per membro, sempre sovrascritta, cancellata all'uscita
 dalla tab e all'archiviazione. Le posizioni più vecchie di 5 minuti non si
 mostrano. Le scritture sono serializzate per membro così una pulizia tardiva non
 cancella la posizione di una sessione appena riaperta.
+
+### Profilo (`pages/Profile.tsx`)
+Identità locale, scelta del tema, comitive, stato della coda offline. Solo ciò
+che esiste davvero sul dispositivo: nessuna impostazione finta.
 
 ### Home e Crew
 - **Home** — onboarding a tre scelte quando è vuota (crea evento / entra con
@@ -337,8 +371,25 @@ e `notify pgrst, 'reload schema'`. Vedi `supabase/README.md`.
 
 ## 8. Design system
 
-Palette **obsidian**, dark unica (nessun light mode). Token Tailwind v4 in
-`src/index.css` (`@theme`): usare sempre i nomi, mai hex letterali nei componenti.
+**Due temi, chiaro di default.** I token sono semantici e puntano a variabili
+`--tt-*` ridefinibili a runtime: `@theme inline` è obbligatorio, perché i token di
+`@theme` sono risolti in fase di build e non sarebbero commutabili. È `lib/theme.ts`
+a risolvere la preferenza `system` in `data-theme`, così i valori del tema scuro
+esistono in un solo blocco CSS invece di essere ripetuti in una media query; lo
+script inline in `index.html` li applica prima del primo paint.
+
+Token semantici da usare nel codice nuovo: `canvas`, `surface`, `overlay`, `fg`,
+`fg-muted`, `line`, `line-strong`, `line-dashed`, `accent`, `on-accent`,
+`accent-soft`, `ok`, `warn`, `danger`, `info`, più le ombre `shadow-card` /
+`shadow-raised` (nel chiaro l'ombra è il separatore principale, nello scuro è
+annullata e resta il bordo).
+
+I nomi storici della palette **obsidian** (`ink`, `cream`, `muted`, `amber`,
+`teal`, `coral`, `border-soft`…) restano come **alias** verso i token semantici:
+i file non ancora migrati rendono corretti in entrambi i temi. Non usarli nel
+codice nuovo — vengono rimossi a migrazione completata.
+
+Il tema scuro conserva esattamente la palette obsidian originale:
 
 | Token | Ruolo | Valore |
 |---|---|---|
@@ -380,9 +431,17 @@ pattern visivo senza necessità reale.
 | `/` | Home: onboarding a 3 scelte se vuota, altrimenti liste |
 | `/join/:inviteCode` | risolve stanza o comitiva, chiede il nome, entra |
 | `/resume/:token` | link di recupero: rivendica un membro su questo device |
+| `/profilo` | profilo: identità locale, tema, comitive, coda offline |
 | `/crew/:crewId` | comitiva: partecipanti, eventi, invito |
-| `/room/:roomId` | stanza, 5 tab in `?tab=` |
+| `/room/:roomId` | shell della stanza; `index` reindirizza ad `adesso` |
+| `/room/:roomId/adesso` | cosa conta adesso |
+| `/room/:roomId/viaggio` | punto di ritrovo, auto, posti, soste |
+| `/room/:roomId/attivita` | itinerario (senza modello dati, §10) |
+| `/room/:roomId/gruppo` | membri, spese, compiti, posizione, impostazioni |
 | `*` | pagina inesistente, con rientro alla Home |
+
+I link `/room/:id?tab=…` già condivisi vengono tradotti nelle nuove sezioni da
+`LEGACY_TABS` in `App.tsx`: gli inviti in circolazione non si rompono.
 
 Tutte in `lazy()`; `ErrorBoundary` a monte evita la schermata bianca senza via
 d'uscita — l'app si usa in mobilità, dove "torna indietro" spesso non basta.
@@ -412,6 +471,17 @@ d'uscita — l'app si usa in mobilità, dove "torna indietro" spesso non basta.
      dal DB, codice invito CSPRNG a 7 caratteri, soste che scompaiono.
    - **Fase 5** PWA con precache e cache per identità, smoke UI e PWA in CI.
 
+4. **Refactor UI su riferimento mockup** (`ff2cf04`, in corso). Fase 1 analisi e
+   fase 2 piano concordati; fase 3 completata: token semantici a doppio tema
+   (chiaro di default, obsidian come tema scuro), navigazione a cinque sezioni
+   promossa a livello app, `RoomShell` con Outlet context, nuovi primitivi
+   (`Avatar`/`AvatarGroup`, `AlertBanner`, `EmptyState`, `SectionHeader`),
+   `Profile`, `TripHeader` + `TripSwitcher`. `Room.tsx`, `TabBar` e `StanzaTab`
+   sono stati sostituiti; nessuna funzionalità rimossa.
+   **Ancora da fare:** composizione delle viste secondo i mockup (card Adesso,
+   route card Viaggio, layout Gruppo), migrazione dei file che usano ancora gli
+   alias legacy, e le attività (§ sotto).
+
 **Stato delle verifiche:** `npm run check`, `npm test` (58 test) e `npm run build`
 passano. Smoke UI e PWA in CI sulle pull request. `scripts/verifyMembership.mjs`
 prova i flussi reali contro il DB in sola DML, creando e ripulendo dati di prova.
@@ -433,3 +503,16 @@ prova i flussi reali contro il DB in sola DML, creando e ripulendo dati di prova
    reale non è stata provata, per il divieto di eseguire DDL.
 7. `docs/AUDIT.md` è una fotografia storica del 3 agosto 2026 e **non** riflette
    il codice attuale; contiene ancora il project ref Supabase in chiaro.
+8. **Attività/itinerario:** manca il modello dati. Servono due tabelle
+   (`activities`, `activity_participants`, sul pattern di
+   `general_expense_participants` incluso il trigger su `room_id`); i tab-giorno
+   si ricavano dai giorni distinti di `activities.starts_at`, così `rooms` non
+   cambia. Sarà il **quarto** blocco SQL del file di schema.
+9. **Senza sorgente dati** e quindi non implementati, per non mostrare dati
+   finti: mappa del percorso e mini-map (nessun provider cartografico nel
+   progetto), km/durata/ETA, traffico, stima carburante e pedaggi, bagagli,
+   contatti di emergenza, avatar fotografici, cover del viaggio, badge
+   notifiche, "sollecita pagamento".
+10. **Smoke UI non eseguibile in locale:** Playwright è una dipendenza effimera
+   (`npx`) e la sandbox non ha rete. I selettori sono stati riallineati alla
+   nuova navigazione ma vanno validati in CI.
