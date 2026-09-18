@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
         id: '/', name: 'Trip Together', short_name: 'Trip Together',
         description: 'Organizza eventi, passaggi e spese con il tuo gruppo.',
         lang: 'it', start_url: '/', scope: '/', display: 'standalone',
-        theme_color: '#0A0A0F', background_color: '#0A0A0F',
+        theme_color: '#f3f5f8', background_color: '#f3f5f8',
         icons: [{ src: '/favicon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' }],
       },
       workbox: {

@@ -1,37 +1,134 @@
 @import "tailwindcss";
 
-@theme {
+/* ═══════════════════════════════════════════════════════════════════════
+   Token semantici a doppio tema.
+
+   `@theme inline` è obbligatorio: i token di `@theme` vengono risolti in
+   fase di build, quindi le utility devono puntare alle variabili --tt-*
+   (ridefinibili a runtime) e non ai valori. Senza `inline` il tema non
+   sarebbe commutabile.
+
+   I nomi legacy della palette "obsidian" (ink, cream, amber, teal…) sono
+   mantenuti come alias: i componenti già scritti continuano a funzionare
+   in entrambi i temi e la migrazione ai nomi semantici procede per gruppi
+   di file, non in un unico passaggio.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+@theme inline {
   --font-sans: 'Roboto', ui-sans-serif, system-ui, sans-serif;
   /* Titoli/heading: sempre Roboto, distinti solo dal peso (vedi .font-serif sotto). */
   --font-serif: 'Roboto', ui-sans-serif, system-ui, sans-serif;
   /* Dati/codici/importi: Roboto Mono per allineamento tabellare. */
   --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, monospace;
 
-  /* Palette "obsidian" */
-  --color-ink: #0a0a0f;
-  --color-ink-deep: #111118;
-  --color-surface: #1a1a25;
-  --color-border-soft: rgba(100, 100, 180, 0.1);
-  --color-border-strong: rgba(100, 100, 180, 0.2);
-  --color-border-dashed: #4a4a6a;
-  --color-highlight-from: #1a1a25;
-  --color-highlight-to: #111118;
-  --color-cream: #c9c9e0;
-  --color-muted: #9999b5;
-  --color-amber: #e8a33d;
-  --color-teal: #46d9c9;
-  --color-coral: #e76f51;
+  /* Superfici e testo */
+  --color-canvas: var(--tt-canvas);
+  --color-surface: var(--tt-surface);
+  --color-overlay: var(--tt-overlay);
+  --color-fg: var(--tt-fg);
+  --color-fg-muted: var(--tt-fg-muted);
+  --color-line: var(--tt-line);
+  --color-line-strong: var(--tt-line-strong);
+  --color-line-dashed: var(--tt-line-dashed);
+
+  /* Accento e colori semantici */
+  --color-accent: var(--tt-accent);
+  --color-on-accent: var(--tt-on-accent);
+  --color-accent-soft: var(--tt-accent-soft);
+  --color-ok: var(--tt-ok);
+  --color-warn: var(--tt-warn);
+  --color-danger: var(--tt-danger);
+  --color-info: var(--tt-info);
+
+  /* Utility shadow-card / shadow-raised */
+  --shadow-card: var(--tt-shadow-card);
+  --shadow-raised: var(--tt-shadow-raised);
+
+  /* ── Alias legacy "obsidian" → token semantici ───────────────────────
+     Da non usare nel codice nuovo. Vengono rimossi quando i 36 file
+     esistenti sono migrati ai nomi semantici. */
+  --color-ink: var(--tt-canvas);
+  --color-ink-deep: var(--tt-overlay);
+  --color-cream: var(--tt-fg);
+  --color-muted: var(--tt-fg-muted);
+  --color-border-soft: var(--tt-line);
+  --color-border-strong: var(--tt-line-strong);
+  --color-border-dashed: var(--tt-line-dashed);
+  --color-highlight-from: var(--tt-highlight-from);
+  --color-highlight-to: var(--tt-highlight-to);
+  --color-teal: var(--tt-accent);
+  --color-amber: var(--tt-warn);
+  --color-coral: var(--tt-danger);
 }
 
+/* ── Tema chiaro (default) ───────────────────────────────────────────────
+   `data-theme` è sempre valorizzato da lib/theme.ts (lo script inline in
+   index.html lo imposta prima del primo paint), anche quando la preferenza
+   è "system": è il JS a risolverla. Così i valori del tema scuro esistono
+   in un solo blocco invece di essere ripetuti anche in una media query.
+
+   I valori di accento e semantici superano 4.5:1 sul bianco, così restano
+   leggibili a 12-13px: un verde più brillante passerebbe solo sui titoli. */
 :root {
+  color-scheme: light;
+
+  --tt-canvas: #f3f5f8;
+  --tt-surface: #ffffff;
+  --tt-overlay: #ffffff;
+  --tt-fg: #0f2035;
+  --tt-fg-muted: #5c6b7f;
+  --tt-line: rgb(15 32 53 / 8%);
+  --tt-line-strong: rgb(15 32 53 / 14%);
+  --tt-line-dashed: #c2cddb;
+  --tt-highlight-from: #ffffff;
+  --tt-highlight-to: #eef7f3;
+
+  --tt-accent: #0d9268;
+  --tt-on-accent: #ffffff;
+  --tt-accent-soft: rgb(13 146 104 / 12%);
+  --tt-ok: #0d9268;
+  --tt-warn: #b45309;
+  --tt-danger: #d92d20;
+  --tt-info: #1d64d8;
+
+  /* Nel chiaro l'ombra sostituisce il bordo come separatore principale;
+     nello scuro è invisibile e il bordo fa tutto il lavoro. */
+  --tt-shadow-card: 0 1px 2px rgb(15 32 53 / 4%), 0 10px 24px -14px rgb(15 32 53 / 14%);
+  --tt-shadow-raised: 0 2px 6px rgb(15 32 53 / 6%), 0 16px 32px -16px rgb(15 32 53 / 18%);
+}
+
+/* ── Tema scuro: la palette "obsidian" originale, invariata ───────────── */
+:root[data-theme="dark"] {
   color-scheme: dark;
+
+  --tt-canvas: #0a0a0f;
+  --tt-surface: #1a1a25;
+  --tt-overlay: #111118;
+  --tt-fg: #c9c9e0;
+  --tt-fg-muted: #9999b5;
+  --tt-line: rgb(100 100 180 / 10%);
+  --tt-line-strong: rgb(100 100 180 / 20%);
+  --tt-line-dashed: #4a4a6a;
+  --tt-highlight-from: #1a1a25;
+  --tt-highlight-to: #111118;
+
+  --tt-accent: #46d9c9;
+  --tt-on-accent: #0a0a0f;
+  --tt-accent-soft: rgb(70 217 201 / 15%);
+  --tt-ok: #46d9c9;
+  --tt-warn: #e8a33d;
+  --tt-danger: #e76f51;
+  --tt-info: #7aa2f7;
+
+  --tt-shadow-card: none;
+  --tt-shadow-raised: 0 12px 32px -12px rgb(0 0 0 / 55%);
 }
 
 body {
   margin: 0;
   min-height: 100svh;
-  background: var(--color-ink);
-  color: var(--color-cream);
+  background: var(--tt-canvas);
+  color: var(--tt-fg);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -39,7 +136,7 @@ body {
 
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--color-teal);
+    outline: 2px solid var(--tt-accent);
     outline-offset: 4px;
   }
   button, a, summary { -webkit-tap-highlight-color: transparent; }
@@ -48,7 +145,7 @@ body {
 }
 
 .sheet { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
-.sheet::backdrop { background: rgb(0 0 0 / 65%); backdrop-filter: blur(5px); }
+.sheet::backdrop { background: rgb(0 0 0 / 45%); backdrop-filter: blur(5px); }
 .bottom-actions { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
 .page-content { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
 

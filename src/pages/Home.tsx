@@ -1,4 +1,4 @@
-import { ArrowUpRight, Calendar, ChevronRight, MapPin, Plus, Ticket, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Calendar, ChevronRight, MapPin, Plus, Ticket, UserRound, UsersRound } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BottomSheet from '../components/ui/BottomSheet'
@@ -68,7 +68,20 @@ export default function Home() {
 
   return (
     <main className="mx-auto flex min-h-svh max-w-4xl flex-col bg-ink">
-      {loading ? <SkeletonHeader /> : <ScreenHeader eyebrow="Trip Together · insieme, si parte" title={myName ? `Ciao, ${myName}` : 'La prossima avventura'} />}
+      {loading ? <SkeletonHeader /> : <ScreenHeader
+        eyebrow="Trip Together · insieme, si parte"
+        title={myName ? `Ciao, ${myName}` : 'La prossima avventura'}
+        action={
+          <button
+            type="button"
+            onClick={() => navigate('/profilo')}
+            aria-label="Apri il tuo profilo"
+            className="flex h-11 w-11 items-center justify-center rounded-full border border-line bg-surface text-fg-muted shadow-card"
+          >
+            <UserRound aria-hidden="true" size={19} />
+          </button>
+        }
+      />}
       <div className="page-content space-y-7 px-4 sm:px-6">
         {loading ? <><SkeletonCard /><SkeletonCard /></> : onboarding ? (
           <>

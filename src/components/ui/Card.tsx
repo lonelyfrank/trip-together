@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 
+// Nel tema chiaro il separatore principale è l'ombra (il bordo da solo
+// sparirebbe sul canvas grigio); nello scuro l'ombra è annullata dai token e
+// resta il bordo. Stesse classi, resa corretta in entrambi i temi.
 const TONES = {
-  surface: 'bg-surface/70 border border-border-soft',
-  highlight: 'bg-gradient-to-br from-highlight-from to-highlight-to border border-border-strong',
-  flat: 'bg-surface/30 opacity-70',
-  dashed: 'border border-dashed border-border-dashed bg-transparent',
+  surface: 'bg-surface border border-line shadow-card',
+  highlight: 'bg-gradient-to-br from-highlight-from to-highlight-to border border-line-strong shadow-card',
+  flat: 'bg-surface/60 border border-line',
+  dashed: 'border border-dashed border-line-dashed bg-transparent',
 } as const
 
 interface CardProps {
@@ -15,7 +18,7 @@ interface CardProps {
 }
 
 export default function Card({ children, tone = 'surface', className = '', onClick }: CardProps) {
-  const base = `rounded-2xl p-4 transition-transform ${TONES[tone]} ${className}`
+  const base = `rounded-[20px] p-4 transition-transform ${TONES[tone]} ${className}`
 
   if (onClick) {
     return (
