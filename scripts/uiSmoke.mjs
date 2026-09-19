@@ -78,18 +78,18 @@ try {
   {
     const {ctx,page,state}=await context(true);
     await page.goto(`${base}/room/${roomId}`);
-    await page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    await page.getByText('Ci sei anche tu?',{exact:true}).waitFor();
     await page.screenshot({path:'/tmp/trip-event-mobile.png',fullPage:true});
-    await page.getByRole('button',{name:'Conferma la tua presenza',exact:true}).click();
-    await page.getByRole('heading',{name:'Troviamo il tuo passaggio'}).waitFor();
-    await page.getByRole('link',{name:'Gruppo',exact:true}).click();
-    assert.equal(new URL(page.url()).pathname,`/room/${roomId}/gruppo`);
+    await page.getByRole('button',{name:/^Il tuo stato: Ci sei anche tu/}).click();
+    await page.getByText('Senza passaggio',{exact:true}).waitFor();
+    await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Spese',exact:true}).click();
+    assert.equal(new URL(page.url()).searchParams.get('tab'),'spese');
     await page.reload();await page.getByRole('button',{name:'Nuova spesa',exact:true}).waitFor();
-    assert.equal(await page.getByRole('link',{name:'Gruppo',exact:true}).getAttribute('aria-current'),'page');
+    assert.equal(await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Spese',exact:true}).getAttribute('aria-current'),'page');
     await page.getByRole('button',{name:'Nuova spesa',exact:true}).click();
     await page.getByLabel('Per cosa avete speso?').fill('Picnic');await page.getByLabel('Importo (€)').fill('12.50');
     state.failParticipants=true;
-    await page.getByRole('button',{name:'Aggiungi spesa',exact:true}).click();
+    await page.getByRole('dialog').getByRole('button',{name:'Aggiungi spesa',exact:true}).click();
     await page.getByText('La spesa è stata creata, ma mancano le quote.',{exact:false}).waitFor();
     assert.equal(state.tables.general_expenses.length,1);
     assert.equal(state.tables.general_expense_participants.length,2);
@@ -98,43 +98,44 @@ try {
     await page.getByRole('dialog').waitFor({state:'detached'});assert.equal(state.tables.general_expenses.length,1);assert.equal(state.tables.general_expense_participants.length,2);
     state.failTable='general_expenses';
     await page.reload();await page.getByText('Non riusciamo a caricare questa sezione').first().waitFor();assert.equal(await page.getByRole('button',{name:'Nuova spesa',exact:true}).count(),0);
-    assert.equal(await page.getByText('Impostazioni evento').count(),0);
-    await page.getByRole('link',{name:'Adesso',exact:true}).click();await page.getByText('Alcuni dati non sono disponibili',{exact:true}).waitFor();
+        await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Stanza',exact:true}).click();await page.getByText('Alcuni dati non sono disponibili',{exact:true}).waitFor();
     console.log('PASS conferma presenza, sezione persistente al refresh, errore spese esplicito, chiusura bloccata con dati incompleti, retry quote senza duplicare la spesa');await ctx.close();
   }
   {
     const {ctx,page,state}=await context(true);
     await page.addInitScript(()=>{Object.defineProperty(navigator,'geolocation',{configurable:true,value:{getCurrentPosition(success){window.pendingGps=success}}})});
-    await page.goto(`${base}/room/${roomId}/gruppo`);await page.getByRole('button',{name:'Attiva radar',exact:true}).click();
-    await page.getByRole('link',{name:'Adesso',exact:true}).click();
-    await page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    await page.goto(`${base}/room/${roomId}?tab=radar`);await page.getByRole('button',{name:'Condividi la mia posizione',exact:true}).click();
+    await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Stanza',exact:true}).click();
+    await page.getByText('Ci sei anche tu?',{exact:true}).waitFor();
     await page.evaluate(()=>window.pendingGps({coords:{latitude:45,longitude:9}}));
     await page.waitForTimeout(150);
     assert.equal(state.requests.filter(req=>req.table==='radar_positions'&&req.method==='POST').length,0);
-    await page.getByRole('link',{name:'Gruppo',exact:true}).click();await page.getByRole('button',{name:'Archivia evento',exact:true}).click();await page.getByRole('button',{name:'Conferma archiviazione',exact:true}).click();
+    await page.getByRole('button',{name:'Archivia evento',exact:true}).click();await page.getByRole('button',{name:'Conferma archiviazione',exact:true}).click();
     await page.waitForURL(base+'/');assert.equal(state.tables.rooms[0].status,'closed');
     assert.deepEqual(state.requests.filter(req=>req.method==='DELETE').map(req=>req.table).filter(table=>table!=='radar_positions'),[]);
-    await page.getByRole('button',{name:/Domenica al lago/}).click();await page.getByRole('heading',{name:'Il ricordo del vostro evento'}).waitFor();assert.equal(await page.getByRole('navigation',{name:'Navigazione principale'}).count(),0);
+    await page.getByRole('button',{name:/Domenica al lago/}).click();await page.getByRole('heading',{name:'Il ricordo del vostro evento'}).waitFor();assert.equal(await page.getByRole('navigation',{name:'Sezioni'}).count(),0);
     console.log('PASS callback GPS tardiva ignorata, archiviazione senza cancellazioni dello storico, riepilogo archivio in sola lettura');await ctx.close();
   }
   {
     const {ctx,page,state}=await context(true);
     await page.goto(`${base}/room/${roomId}`);
-    await page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
-    await page.getByRole('link',{name:'Viaggio',exact:true}).click();
+    await page.getByText('Ci sei anche tu?',{exact:true}).waitFor();
+    const openDetails=async()=>{await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Auto',exact:true}).click();await page.getByRole('button',{name:'Punto di ritrovo',exact:true}).click();await page.getByRole('dialog').waitFor();};
+    await openDetails();
     for(const [local,iso] of [['2027-01-15T10:30','2027-01-15T09:30:00.000Z'],['2027-07-15T10:30','2027-07-15T08:30:00.000Z']]) {
       await page.getByRole('button',{name:/\d{2}:\d{2} modifica/}).click();
       await page.locator('input[type="datetime-local"]').fill(local);
       await page.getByRole('button',{name:'Salva data',exact:true}).click();
       await page.locator('input[type="datetime-local"]').waitFor({state:'detached'});
       assert.equal(state.tables.rooms[0].event_time,iso);
-      await page.reload(); await page.getByRole('button',{name:/\d{2}:\d{2} modifica/}).click();
+      await page.reload(); await openDetails(); await page.getByRole('button',{name:/\d{2}:\d{2} modifica/}).click();
       assert.equal(await page.locator('input[type="datetime-local"]').inputValue(),local);
       await page.getByRole('button',{name:'Salva data',exact:true}).click();
       await page.locator('input[type="datetime-local"]').waitFor({state:'detached'});
       assert.equal(state.tables.rooms[0].event_time,iso);
     }
-    await page.getByRole('link',{name:'Gruppo',exact:true}).click();
+    await page.keyboard.press('Escape');
+    await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Bacheca',exact:true}).click();
     await page.getByRole('button',{name:'Aggiungi nota',exact:true}).click();
     await page.getByPlaceholder('Scrivi una nota...').fill('Non perdere questa nota');
     state.failTable='board_notes';
@@ -178,8 +179,8 @@ try {
     await page.goto(`${base}/room/${roomId}`);await page.getByText('Sereno',{exact:true}).waitFor();
     assert.equal(weatherRequests,1);
     for(let i=0;i<3;i++) {
-      await page.getByRole('link',{name:'Gruppo',exact:true}).click();
-      await page.getByRole('link',{name:'Adesso',exact:true}).click();
+      await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Spese',exact:true}).click();
+      await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Stanza',exact:true}).click();
       await page.getByText('Sereno',{exact:true}).waitFor();
     }
     assert.equal(weatherRequests,1);
@@ -191,13 +192,13 @@ try {
   }
   {
     const {ctx,page,state}=await context(true);
-    await page.goto(`${base}/room/${roomId}`);await page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    await page.goto(`${base}/room/${roomId}`);await page.getByText('Ci sei anche tu?',{exact:true}).waitFor();
     await page.evaluate(()=>{Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>false});window.dispatchEvent(new Event('offline'))});
-    await page.getByRole('button',{name:'Conferma la tua presenza',exact:true}).click();
-    await page.getByRole('heading',{name:'Troviamo il tuo passaggio'}).waitFor();
+    await page.getByRole('button',{name:/^Il tuo stato: Ci sei anche tu/}).click();
+    await page.getByText('Senza passaggio',{exact:true}).waitFor();
     await page.getByText('Salveremo la modifica al ritorno online',{exact:true}).waitFor();
     assert.equal(state.tables.members[0].confirmed,false);
-    await page.getByRole('link',{name:'Gruppo',exact:true}).click();
+    await page.locator('nav[aria-label="Sezioni"]').getByRole('button',{name:'Bacheca',exact:true}).click();
     await page.getByRole('button',{name:'Aggiungi nota',exact:true}).click();
     await page.getByPlaceholder('Scrivi una nota...').fill('Nota offline');
     await page.getByRole('button',{name:'Aggiungi',exact:true}).click();
@@ -210,7 +211,7 @@ try {
       Object.defineProperty(navigator,'onLine',{configurable:true,get:()=>true});window.dispatchEvent(new Event('online'));
     });
     await page.getByText('Una modifica non salvata è stata persa. Ricontrolla i dati dell’evento.',{exact:true}).waitFor();
-    await page.getByText('Nota offline',{exact:true}).waitFor();
+    await page.getByText('Nota offline',{exact:true}).first().waitFor();
     assert.equal(state.tables.members[0].confirmed,true);
     assert.equal(await page.evaluate(()=>JSON.parse(localStorage.getItem('tt:offline-queue')).length),0);
     console.log('PASS conferma presenza e nota offline con feedback; operazione irrecuperabile scartata con avviso e coda sbloccata');
@@ -235,7 +236,7 @@ try {
     await joined.page.getByRole('heading',{name:'Domenica al lago',exact:true}).waitFor();
     assert(joined.state.requests.some(req=>req.table==='resolve_invite'));
     const token=Buffer.from(JSON.stringify({roomId,memberId,inviteCode:'LAGO42'})).toString('base64url');
-    await joined.page.goto(`${base}/resume/${token}`);await joined.page.getByRole('heading',{name:'Ci sei anche tu?'}).waitFor();
+    await joined.page.goto(`${base}/resume/${token}`);await joined.page.getByText('Ci sei anche tu?',{exact:true}).waitFor();
     assert(joined.state.requests.some(req=>req.table==='claim_member'));
     console.log('PASS creazione, invito e recupero via RPC; errore di ingresso leggibile senza dettaglio SQL');
     await joined.ctx.close();
