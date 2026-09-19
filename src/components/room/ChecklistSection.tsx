@@ -63,16 +63,16 @@ export default function ChecklistSection({ roomId, currentMember, members, items
 
   return (
     <div className="space-y-2">
-      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Cosa portiamo (tutta la comitiva)</p>
+      <p className="text-[12.5px] font-bold text-fg">Cosa portiamo (tutta la comitiva)</p>
       <div className="space-y-1.5">
         {items.map((item) => {
           const assignee = memberById(item.assigned_to)
           const canToggle = currentMember.role === 'creator' || item.assigned_to === currentMember.id
           return (
-            <div key={item.id} className="flex items-center gap-2 rounded-xl bg-surface/60 px-3.5 py-2.5">
+            <div key={item.id} className="flex items-center gap-2 rounded-card border border-line bg-surface shadow-card px-3.5 py-2.5">
               <button onClick={() => toggleStatus(item)} disabled={!canToggle} className="shrink-0">
                 {item.status === 'portato' ? (
-                  <Check size={15} className="text-accent" />
+                  <Check size={15} className="text-brand-text" />
                 ) : (
                   <Circle size={15} className={canToggle ? 'text-line-dashed' : 'text-line'} />
                 )}
@@ -81,9 +81,9 @@ export default function ChecklistSection({ roomId, currentMember, members, items
                 {item.title}
               </span>
               {assignee ? (
-                <span className="shrink-0 font-mono text-[10px] text-fg-muted">{assignee.display_name}</span>
+                <span className="shrink-0 text-[10.5px] text-fg-muted">{assignee.display_name}</span>
               ) : (
-                <button onClick={() => selfAssign(item)} className="shrink-0 font-mono text-[10px] text-accent underline">
+                <button onClick={() => selfAssign(item)} className="shrink-0 text-[10.5px] text-brand-text underline">
                   non assegnato
                 </button>
               )}

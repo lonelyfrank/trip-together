@@ -1,64 +1,68 @@
-import { Calendar, ChevronDown, MapPin } from 'lucide-react'
-import { useState } from 'react'
-import Chip from './ui/Chip'
-import TripSwitcher from './TripSwitcher'
-import { formatEventTime } from '../lib/format'
-import type { RoomPhase } from '../lib/phase'
+import { Bell } from 'lucide-react'
+import { ASSETS } from '../lib/assets'
 import type { Room } from '../types'
 
-// Un solo livello di intestazione invece dei tre sovrapposti dei mockup
-// (logo+tagline, titolo viaggio, titolo sezione): lì occupavano ~250px prima
-// del contenuto. Titolo, contesto e stato stanno in una riga sola, e il
-// titolo stesso è il punto di accesso al cambio evento.
-const PHASE: Record<RoomPhase, { label: string; tone: 'muted' | 'ok' | 'warn' }> = {
-  pre: { label: 'In programma', tone: 'warn' },
-  in_corso: { label: 'Viaggio in corso', tone: 'ok' },
-  concluso: { label: 'Concluso', tone: 'muted' },
-}
+// Header globale del mockup: marchio a sinistra, avvisi e miniatura
+// dell'evento a destra. La miniatura è anche la porta per cambiare evento
+// (e da lì al profilo), perché la barra in basso è tutta della stanza.
 
 interface TripHeaderProps {
   room: Room
-  phase: RoomPhase
-  memberCount: number
+  /** Ritardi aperti: l'unica cosa che oggi merita un badge. */
+  alertCount?: number
+  onAlerts?: () => void
+  onSwitch: () => void
 }
 
-export default function TripHeader({ room, phase, memberCount }: TripHeaderProps) {
-  const [switching, setSwitching] = useState(false)
-  const meta = PHASE[phase]
-
+export default function TripHeader({ room, alertCount = 0, onAlerts, onSwitch }: TripHeaderProps) {
   return (
-    <header className="sticky top-0 z-20 border-b border-line bg-surface/90 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur sm:px-6">
-      <div className="mx-auto flex max-w-4xl items-start justify-between gap-3">
-        <div className="min-w-0">
+    <header className="shrink-0 bg-canvas px-[var(--tt-page-x)] pb-0.5 pt-[max(4px,env(safe-area-inset-top))]">
+      <div className="mx-auto flex h-[41px] max-w-[430px] items-center gap-2">
+        {ASSETS.logo ? (
+          <img src={ASSETS.logo} alt="" className="h-[31px] w-[38px] object-cover" draggable={false} />
+        ) : (
+          <span aria-hidden="true" className="h-[31px] w-[38px] rounded-lg bg-gradient-to-br from-blue to-brand" />
+        )}
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <p className="text-[15px] font-bold leading-none tracking-[-0.2px] text-fg">Trip Together</p>
+          <p className="text-[10.5px] leading-none text-fg-muted">Viaggiare è meglio insieme</p>
+        </div>
+        <div className="ml-auto flex items-center gap-1.5">
+          {onAlerts && (
+            <button
+              type="button"
+              onClick={onAlerts}
+              aria-label={alertCount > 0 ? `Avvisi, ${alertCount} ritardi aperti` : 'Avvisi, nessun ritardo'}
+              className="press relative flex h-11 w-[34px] items-center justify-center text-fg"
+            >
+              <Bell aria-hidden="true" size={20} strokeWidth={1.7} />
+              {alertCount > 0 && (
+                <span className="absolute right-0.5 top-[7px] flex h-3.5 min-w-3.5 items-center justify-center rounded-[7px] bg-danger px-[3px] text-[9px] font-bold leading-none text-white">
+                  {alertCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => setSwitching(true)}
+            onClick={onSwitch}
             aria-haspopup="dialog"
-            className="flex min-h-11 max-w-full items-center gap-1.5 text-left"
+            aria-label={`${room.title}: cambia evento o apri il profilo`}
+            className="press flex h-11 w-11 items-center justify-center"
           >
-            <h1 className="truncate font-serif text-xl leading-tight text-fg sm:text-2xl">{room.title}</h1>
-            <ChevronDown aria-hidden="true" size={18} className="shrink-0 text-fg-muted" />
-            <span className="sr-only">Cambia evento</span>
+            {ASSETS.trip ? (
+              <img
+                src={ASSETS.trip}
+                alt=""
+                className="h-10 w-10 rounded-full object-cover shadow-float ring-[1.5px] ring-surface"
+                draggable={false}
+              />
+            ) : (
+              <span className="h-10 w-10 rounded-full bg-gradient-to-br from-blue to-brand" />
+            )}
           </button>
-          <p className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-fg-muted">
-            <span className="flex items-center gap-1">
-              <Calendar aria-hidden="true" size={13} />
-              {room.event_time ? formatEventTime(room.event_time) : 'Data da scegliere'}
-            </span>
-            <span className="flex items-center gap-1">
-              <MapPin aria-hidden="true" size={13} />
-              {room.destination_label || 'Destinazione da scegliere'}
-            </span>
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5">
-          <Chip tone={meta.tone}>{meta.label}</Chip>
-          <span className="font-mono text-[11px] text-fg-muted">
-            {memberCount} {memberCount === 1 ? 'membro' : 'membri'} · #{room.invite_code}
-          </span>
         </div>
       </div>
-      <TripSwitcher open={switching} onClose={() => setSwitching(false)} currentRoomId={room.id} />
     </header>
   )
 }

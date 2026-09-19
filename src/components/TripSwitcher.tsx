@@ -1,4 +1,4 @@
-import { ArrowUpRight, Calendar, ChevronRight, MapPin, UsersRound } from 'lucide-react'
+import { ArrowUpRight, Calendar, ChevronRight, MapPin, User, UsersRound } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import BottomSheet from './ui/BottomSheet'
 import Button from './ui/Button'
@@ -33,7 +33,7 @@ export default function TripSwitcher({ open, onClose, currentRoomId }: TripSwitc
   }
 
   return (
-    <BottomSheet open={open} onClose={onClose} title="Cambia evento">
+    <BottomSheet open={open} onClose={onClose} title="I tuoi eventi">
       <div className="space-y-5 pb-2">
         {isLoading ? (
           <div className="space-y-2"><SkeletonCard /><SkeletonCard /></div>
@@ -46,13 +46,13 @@ export default function TripSwitcher({ open, onClose, currentRoomId }: TripSwitc
           <>
             {open_.length > 0 && (
               <section>
-                <h3 className="mb-2 text-xs font-medium uppercase tracking-widest text-fg-muted">In programma</h3>
+                <h3 className="mb-2 text-[12.5px] font-bold text-fg">In programma</h3>
                 <ul className="space-y-1.5">
                   {open_.map(({ room, memberCount }) => (
                     <li key={room.id}>
                       <button
                         type="button"
-                        onClick={() => go(`/room/${room.id}/adesso`)}
+                        onClick={() => go(`/room/${room.id}`)}
                         className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface p-3 text-left transition-transform active:scale-[0.98]"
                       >
                         <div className="min-w-0 flex-1">
@@ -75,13 +75,13 @@ export default function TripSwitcher({ open, onClose, currentRoomId }: TripSwitc
 
             {archived.length > 0 && (
               <section>
-                <h3 className="mb-2 text-xs font-medium uppercase tracking-widest text-fg-muted">Archiviati</h3>
+                <h3 className="mb-2 text-[12.5px] font-bold text-fg">Archiviati</h3>
                 <ul className="space-y-1.5">
                   {archived.map(({ room }) => (
                     <li key={room.id}>
                       <button
                         type="button"
-                        onClick={() => go(`/room/${room.id}/adesso`)}
+                        onClick={() => go(`/room/${room.id}`)}
                         className="flex w-full items-center gap-3 rounded-2xl border border-line p-3 text-left"
                       >
                         <p className="min-w-0 flex-1 truncate text-sm text-fg-muted">{room.title}</p>
@@ -97,7 +97,7 @@ export default function TripSwitcher({ open, onClose, currentRoomId }: TripSwitc
 
         {crews.length > 0 && (
           <section>
-            <h3 className="mb-2 text-xs font-medium uppercase tracking-widest text-fg-muted">Le tue comitive</h3>
+            <h3 className="mb-2 text-[12.5px] font-bold text-fg">Le tue comitive</h3>
             <ul className="space-y-1.5">
               {crews.map(({ crew, eventCount }) => (
                 <li key={crew.id}>
@@ -106,7 +106,7 @@ export default function TripSwitcher({ open, onClose, currentRoomId }: TripSwitc
                     onClick={() => go(`/crew/${crew.id}`)}
                     className="flex w-full items-center gap-3 rounded-2xl border border-line p-3 text-left"
                   >
-                    <UsersRound aria-hidden="true" size={18} className="shrink-0 text-accent" />
+                    <UsersRound aria-hidden="true" size={18} className="shrink-0 text-brand-text" />
                     <p className="min-w-0 flex-1 truncate text-sm text-fg">{crew.name}</p>
                     <span className="shrink-0 text-[12px] text-fg-muted">{eventCount} eventi</span>
                   </button>
@@ -116,9 +116,14 @@ export default function TripSwitcher({ open, onClose, currentRoomId }: TripSwitc
           </section>
         )}
 
-        <Button variant="surface" className="w-full" onClick={() => go('/')}>
-          <ArrowUpRight size={16} /> Tutti i tuoi eventi
-        </Button>
+        <div className="grid grid-cols-2 gap-2">
+          <Button variant="surface" onClick={() => go('/')}>
+            <ArrowUpRight size={16} /> Tutti gli eventi
+          </Button>
+          <Button variant="surface" onClick={() => go('/profilo')}>
+            <User size={16} /> Profilo
+          </Button>
+        </div>
       </div>
     </BottomSheet>
   )

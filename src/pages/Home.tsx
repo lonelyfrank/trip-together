@@ -96,7 +96,7 @@ export default function Home() {
             </Card>
             <Card onClick={() => openSheet('crew')}>
               <div className="flex items-center gap-4">
-                <UsersRound size={24} className="shrink-0 text-accent" />
+                <UsersRound size={24} className="shrink-0 text-brand-text" />
                 <div className="flex-1"><h2 className="font-semibold">Viaggiate spesso insieme?</h2><p className="mt-1 text-sm leading-relaxed text-fg-muted">Crea una comitiva e ritrova lo stesso gruppo a ogni evento.</p></div>
                 <ChevronRight size={18} className="shrink-0 text-fg-muted" />
               </div>
@@ -104,10 +104,10 @@ export default function Home() {
           </>
         ) : (
           <>
-            {loadError && <div role="alert" className="rounded-2xl border border-danger/25 bg-danger/10 p-4"><p className="text-sm text-danger">Non riusciamo a caricare tutti i tuoi eventi.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => window.location.reload()}>Riprova</Button></div>}
+            {loadError && <div role="alert" className="rounded-2xl border border-danger/25 bg-danger/10 p-4"><p className="text-sm text-danger-text">Non riusciamo a caricare tutti i tuoi eventi.</p><Button variant="outline" size="sm" className="mt-3" onClick={() => window.location.reload()}>Riprova</Button></div>}
             {featured ? (
               <section aria-label="Evento in evidenza">
-                <p className="mb-3 text-xs font-medium uppercase tracking-widest text-fg-muted">{nextEvent ? 'La prossima partenza' : 'Da organizzare insieme'}</p>
+                <p className="mb-3 text-xs uppercase tracking-wide font-bold text-fg-muted">{nextEvent ? 'La prossima partenza' : 'Da organizzare insieme'}</p>
                 <EventCard summary={featured} featured onOpen={() => navigate(`/room/${featured.room.id}`)} />
               </section>
             ) : !loadError && (
@@ -115,21 +115,21 @@ export default function Home() {
             )}
             <div className="grid gap-7 md:grid-cols-2">
               <section className="space-y-3" aria-label="Altri eventi">
-                <h2 className="text-xs font-medium uppercase tracking-widest text-fg-muted">Altri eventi · {otherEvents.length}</h2>
+                <h2 className="text-xs uppercase tracking-wide font-bold text-fg-muted">Altri eventi · {otherEvents.length}</h2>
                 {otherEvents.map((summary) => <EventCard key={summary.room.id} summary={summary} onOpen={() => navigate(`/room/${summary.room.id}`)} />)}
                 {otherEvents.length === 0 && <p className="text-sm leading-relaxed text-fg-muted">Gli altri eventi a cui partecipi appariranno qui.</p>}
                 <Button variant="outline" onClick={() => openSheet('join')}><Ticket size={16} /> Entra con un invito</Button>
               </section>
               <section className="space-y-3" aria-label="Comitive">
-                <h2 className="text-xs font-medium uppercase tracking-widest text-fg-muted">Le tue comitive</h2>
+                <h2 className="text-xs uppercase tracking-wide font-bold text-fg-muted">Le tue comitive</h2>
                 {crews.map(({ crew, memberCount, eventCount }) => (
-                  <Card key={crew.id} onClick={() => navigate(`/crew/${crew.id}`)}><div className="flex items-center gap-3"><UsersRound size={22} className="shrink-0 text-accent" /><div className="min-w-0 flex-1"><h3 className="truncate font-semibold">{crew.name}</h3><p className="mt-1 text-sm text-fg-muted">{memberCount} partecipanti · {eventCount} eventi</p></div><ChevronRight size={18} className="shrink-0 text-fg-muted" /></div></Card>
+                  <Card key={crew.id} onClick={() => navigate(`/crew/${crew.id}`)}><div className="flex items-center gap-3"><UsersRound size={22} className="shrink-0 text-brand-text" /><div className="min-w-0 flex-1"><h3 className="truncate font-semibold">{crew.name}</h3><p className="mt-1 text-sm text-fg-muted">{memberCount} partecipanti · {eventCount} eventi</p></div><ChevronRight size={18} className="shrink-0 text-fg-muted" /></div></Card>
                 ))}
                 {crews.length === 0 && <p className="text-sm leading-relaxed text-fg-muted">Una comitiva tiene insieme gli amici e tutti i vostri eventi.</p>}
                 <Button variant="outline" onClick={() => openSheet('crew')}><Plus size={16} /> Crea comitiva</Button>
               </section>
             </div>
-            {closedRooms.length > 0 && <section className="space-y-3"><h2 className="text-xs font-medium uppercase tracking-widest text-fg-muted">Eventi archiviati</h2><div className="grid gap-3 md:grid-cols-2">{closedRooms.map((summary) => <EventCard key={summary.room.id} summary={summary} onOpen={() => navigate(`/room/${summary.room.id}`)} />)}</div></section>}
+            {closedRooms.length > 0 && <section className="space-y-3"><h2 className="text-xs uppercase tracking-wide font-bold text-fg-muted">Eventi archiviati</h2><div className="grid gap-3 md:grid-cols-2">{closedRooms.map((summary) => <EventCard key={summary.room.id} summary={summary} onOpen={() => navigate(`/room/${summary.room.id}`)} />)}</div></section>}
           </>
         )}
       </div>
@@ -139,7 +139,7 @@ export default function Home() {
           <form onSubmit={goToJoin} className="space-y-5"><TextField label="Codice invito" hint="Trovi il codice nell’invito condiviso dai tuoi amici." autoFocus autoCapitalize="characters" autoComplete="off" required value={joinCode} onChange={(event) => setJoinCode(event.target.value)} /><Button type="submit" className="w-full" disabled={!joinCode.trim()}>Continua <ArrowUpRight size={17} /></Button></form>
         ) : (
           <form onSubmit={submitSheet} className="space-y-5" aria-busy={submitting}>
-            {error && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger">{error}</p>}
+            {error && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger-text">{error}</p>}
             <TextField label={sheet === 'crew' ? 'Nome della comitiva' : 'Nome dell’evento'} placeholder={sheet === 'crew' ? 'Es. I soliti otto' : 'Es. Domenica al lago'} autoFocus required maxLength={80} value={title} onChange={(event) => setTitle(event.target.value)} />
             <TextField label="Il tuo nome" autoComplete="given-name" required maxLength={40} value={name} onChange={(event) => setName(event.target.value)} />
             {sheet === 'event' && <p className="text-sm leading-relaxed text-fg-muted">Luogo e data si possono scegliere dopo. Inizia dal gruppo.</p>}

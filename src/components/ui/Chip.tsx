@@ -1,31 +1,43 @@
 import type { ReactNode } from 'react'
 
-// Toni semantici (ok/warn/danger/info) + gli alias storici usati dai
-// componenti già scritti. `solid` serve dove il chip è l'unico portatore
-// dello stato e una tinta al 12% non basterebbe a farlo notare.
+// StatusBadge del mockup: pillola tenue, testo 600. I toni storici (ok,
+// warn, info, muted…) restano come alias per le pagine fuori dalla stanza.
 const TONES = {
-  muted: 'bg-canvas text-fg-muted',
-  ok: 'bg-ok/12 text-ok',
-  warn: 'bg-warn/12 text-warn',
-  danger: 'bg-danger/12 text-danger',
-  info: 'bg-info/12 text-info',
-  solid: 'bg-accent text-on-accent',
-  // Alias legacy.
-  amber: 'bg-warn/12 text-warn',
-  teal: 'bg-accent/12 text-accent',
-  alert: 'bg-danger/12 text-danger',
+  brand: 'bg-brand-soft text-brand-text',
+  blue: 'bg-blue-soft text-blue',
+  purple: 'bg-purple-soft text-purple',
+  warning: 'bg-warning-soft text-warning-text',
+  danger: 'bg-danger-soft text-danger-text',
+  grey: 'bg-grey-soft text-fg-muted',
+  solid: 'bg-brand-button text-on-accent',
+  // Alias
+  muted: 'bg-grey-soft text-fg-muted',
+  ok: 'bg-brand-soft text-brand-text',
+  warn: 'bg-warning-soft text-warning-text',
+  info: 'bg-blue-soft text-blue',
+  amber: 'bg-warning-soft text-warning-text',
+  teal: 'bg-brand-soft text-brand-text',
+  alert: 'bg-danger-soft text-danger-text',
 } as const
+
+const SIZES = {
+  md: 'px-2 py-[5px] text-[10.5px]',
+  sm: 'px-2 py-1 text-[9.5px]',
+} as const
+
+export type ChipTone = keyof typeof TONES
 
 interface ChipProps {
   children: ReactNode
-  tone?: keyof typeof TONES
+  tone?: ChipTone
+  size?: keyof typeof SIZES
   className?: string
 }
 
-export default function Chip({ children, tone = 'muted', className = '' }: ChipProps) {
+export default function Chip({ children, tone = 'muted', size = 'md', className = '' }: ChipProps) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium ${TONES[tone]} ${className}`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full font-semibold leading-none ${TONES[tone]} ${SIZES[size]} ${className}`}
     >
       {children}
     </span>

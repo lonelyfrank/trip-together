@@ -1,8 +1,8 @@
-import type { ReactNode } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 
-// Nel tema chiaro il separatore principale è l'ombra (il bordo da solo
-// sparirebbe sul canvas grigio); nello scuro l'ombra è annullata dai token e
-// resta il bordo. Stesse classi, resa corretta in entrambi i temi.
+// Card del mockup: bianca, bordo quasi invisibile, raggio 12, ombra doppia.
+// Con `onClick` diventa un unico bottone: nel mockup il chevron nel titolo
+// promette che tutta la card è tappabile, non solo la freccia.
 const TONES = {
   surface: 'bg-surface border border-line shadow-card',
   highlight: 'bg-gradient-to-br from-highlight-from to-highlight-to border border-line-strong shadow-card',
@@ -14,19 +14,34 @@ interface CardProps {
   children: ReactNode
   tone?: keyof typeof TONES
   className?: string
+  style?: CSSProperties
   onClick?: () => void
+  /** Nome accessibile quando la card intera è un bottone. */
+  label?: string
+  /** Contenuto in riga (icona, testo, azione) invece che in colonna. */
+  row?: boolean
 }
 
-export default function Card({ children, tone = 'surface', className = '', onClick }: CardProps) {
-  const base = `rounded-[20px] p-4 transition-transform ${TONES[tone]} ${className}`
-
+export default function Card({ children, tone = 'surface', className = '', style, onClick, label, row = false }: CardProps) {
+  const base = `overflow-hidden rounded-card p-[9px] ${TONES[tone]} ${className}`
   if (onClick) {
+    // Un <button> centra il contenuto in verticale: in colonna, dall'alto,
+    // come una card qualsiasi.
     return (
-      <button type="button" onClick={onClick} className={`w-full text-left active:scale-[0.98] ${base}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        aria-label={label}
+        style={style}
+        className={`press flex w-full text-left text-fg ${row ? 'flex-row items-center' : 'flex-col items-stretch justify-start'} ${base}`}
+      >
         {children}
       </button>
     )
   }
-
-  return <div className={base}>{children}</div>
+  return (
+    <div style={style} className={`${row ? 'flex items-center' : 'block'} ${base}`}>
+      {children}
+    </div>
+  )
 }

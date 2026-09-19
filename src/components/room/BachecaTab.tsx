@@ -75,7 +75,7 @@ export default function BachecaTab({
 
   return (
     <div className="space-y-3">
-      <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Note</p>
+      <p className="text-[12.5px] font-bold text-fg">Note</p>
       <div className="space-y-2">
         {notes.map((n) => (
           <Card key={n.id} tone={n.pinned ? 'highlight' : 'surface'} className="flex gap-2.5 !p-3.5">
@@ -122,7 +122,7 @@ export default function BachecaTab({
         <ChecklistSection roomId={roomId} currentMember={currentMember} members={members} items={roomChecklistItems} />
       </div>
 
-      <p className="pt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Link utili</p>
+      <p className="pt-2 text-[12.5px] font-bold text-fg">Link utili</p>
       <div className="space-y-2">
         {boardLinks.map((l) => (
           <a
@@ -130,15 +130,15 @@ export default function BachecaTab({
             href={normalizedHref(l.url)}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center justify-between rounded-2xl bg-surface/60 p-3.5 transition-transform active:scale-[0.98]"
+            className="flex items-center justify-between rounded-card border border-line bg-surface shadow-card p-3.5 transition-transform active:scale-[0.98]"
           >
             <div className="flex items-center gap-2.5">
               <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-canvas">
-                <Link2 size={13} className="text-accent" />
+                <Link2 size={13} className="text-brand-text" />
               </div>
               <div>
                 <p className="text-[13px] text-fg">{l.label}</p>
-                <p className="font-mono text-[10px] text-fg-muted">{l.url}</p>
+                <p className="text-[10.5px] text-fg-muted">{l.url}</p>
               </div>
             </div>
             <ChevronRight size={14} className="text-fg-muted" />

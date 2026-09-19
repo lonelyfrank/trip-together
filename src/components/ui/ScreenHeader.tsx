@@ -10,7 +10,7 @@ export default function ScreenHeader({ eyebrow, title, action }: ScreenHeaderPro
   return (
     <header className="flex items-end justify-between gap-4 px-4 pb-6 pt-6 sm:px-6">
       <div className="min-w-0">
-        <p className="mb-2 text-xs font-medium uppercase tracking-[0.16em] text-fg-muted">
+        <p className="mb-2 text-xs uppercase tracking-wide font-bold text-fg-muted">
           {eyebrow}
         </p>
         <h1 className="break-words font-serif text-3xl leading-tight text-fg">{title}</h1>

@@ -259,7 +259,7 @@ export default function PollsSection({
                           type="button"
                           onClick={() => remove(poll)}
                           aria-label={`Elimina ${poll.question}`}
-                          className="inline-flex min-h-9 items-center rounded-full px-2.5 text-fg-muted hover:text-danger"
+                          className="inline-flex min-h-9 items-center rounded-full px-2.5 text-fg-muted hover:text-danger-text"
                         >
                           <Trash2 size={14} />
                         </button>

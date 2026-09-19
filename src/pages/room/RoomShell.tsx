@@ -1,35 +1,41 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Outlet, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import ArchiveSummary from '../../components/room/ArchiveSummary'
-import BottomNavigation, { type NavId } from '../../components/BottomNavigation'
+import BottomNavigation from '../../components/BottomNavigation'
+import { isTabId, type TabId } from '../../lib/tabs'
 import TripHeader from '../../components/TripHeader'
+import TripSwitcher from '../../components/TripSwitcher'
 import Button from '../../components/ui/Button'
 import { Skeleton, SkeletonCard, SkeletonHeader } from '../../components/ui/Skeleton'
 import { useRoomData } from '../../hooks/useRoomData'
-import type { RoomContextValue, RoomSection } from '../../hooks/useRoomContext'
+import type { RoomContextValue } from '../../hooks/useRoomContext'
 import { getSavedRoomEntry, saveRoomEntry } from '../../lib/localRooms'
 import { roomPhase } from '../../lib/phase'
 import { ensureAnonymousSession, supabase } from '../../lib/supabase'
 
 // Shell della stanza: legge i dati una volta, tiene header e navigazione
-// stabili fra le sezioni e passa tutto alle pagine figlie via Outlet context.
+// stabili fra le tab e passa tutto alle pagine figlie via Outlet context.
 // Gli stati di accesso (gate, errore, invito mancante, archivio) restano qui
-// perché valgono per tutte le sezioni, non per una sola.
-
-const SECTIONS: RoomSection[] = ['adesso', 'viaggio', 'attivita', 'gruppo']
+// perché valgono per tutte le tab, non per una sola.
+//
+// La tab attiva vive nell'URL (`?tab=auto`) e cambia con `replace`: il tasto
+// indietro esce dalla stanza invece di ripercorrere ogni tab visitata.
 
 export default function RoomShell() {
   const { roomId } = useParams<{ roomId: string }>()
   const navigate = useNavigate()
   const { pathname } = useLocation()
-
-  const active: NavId = SECTIONS.find((section) => pathname.endsWith(`/${section}`)) ?? 'adesso'
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const onSubPage = pathname.endsWith('/attivita')
+  const active: TabId = !onSubPage && isTabId(tabParam) ? tabParam : 'stanza'
 
   const entry = useMemo(() => (roomId ? getSavedRoomEntry(roomId) : null), [roomId])
   const [identity, setIdentity] = useState<{ roomId: string; userId: string; memberIds: string[] } | null>(null)
   const [accessError, setAccessError] = useState(false)
   const [accessAttempt, setAccessAttempt] = useState(0)
   const [inviteCode, setInviteCode] = useState('')
+  const [switching, setSwitching] = useState(false)
   const checkedMembership = identity?.roomId === roomId
 
   useEffect(() => {
@@ -77,7 +83,7 @@ export default function RoomShell() {
 
   if ((!checkedMembership && !accessError) || data.isLoading) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-4xl flex-col">
+      <div className="mx-auto flex min-h-svh max-w-[430px] flex-col">
         <Skeleton className="mx-4 mt-3 h-3 w-24 sm:mx-6" />
         <SkeletonHeader />
         <div className="flex-1 space-y-2.5 px-4 pb-10 sm:px-6">
@@ -91,8 +97,8 @@ export default function RoomShell() {
   // Errore di lettura (es. tabella mancante) ≠ stanza inesistente: stato distinto.
   if (data.error || accessError) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-danger">Non riusciamo a caricare questo evento.</p>
+      <div className="mx-auto flex min-h-svh max-w-[430px] flex-col items-center justify-center gap-4 px-6 text-center">
+        <p className="text-danger-text">Non riusciamo a caricare questo evento.</p>
         <p className="text-sm text-fg-muted">Controlla la connessione e riprova.</p>
         <Button
           variant="outline"
@@ -106,7 +112,7 @@ export default function RoomShell() {
 
   if (!room) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
+      <div className="mx-auto flex min-h-svh max-w-[430px] flex-col items-center justify-center gap-4 px-6 text-center">
         <h1 className="font-serif text-2xl text-fg">Serve un invito per aprire questo evento</h1>
         <form
           className="flex w-full max-w-sm flex-col gap-3"
@@ -140,11 +146,13 @@ export default function RoomShell() {
   }
 
   const phase = roomPhase(room.status, cars.map((c) => c.travel_status))
+  const switcher = <TripSwitcher open={switching} onClose={() => setSwitching(false)} currentRoomId={room.id} />
 
   if (room.status === 'closed') {
     return (
-      <div className="mx-auto flex min-h-svh max-w-4xl flex-col">
-        <TripHeader room={room} phase={phase} memberCount={members.length} />
+      <div className="mx-auto flex min-h-svh max-w-[430px] flex-col">
+        <TripHeader room={room} onSwitch={() => setSwitching(true)} />
+        {switcher}
         <ArchiveSummary data={data} />
       </div>
     )
@@ -152,8 +160,9 @@ export default function RoomShell() {
 
   if (!currentMember) {
     return (
-      <div className="mx-auto flex min-h-svh max-w-4xl flex-col">
-        <TripHeader room={room} phase={phase} memberCount={members.length} />
+      <div className="mx-auto flex min-h-svh max-w-[430px] flex-col">
+        <TripHeader room={room} onSwitch={() => setSwitching(true)} />
+        {switcher}
         <div className="space-y-4 px-6 py-8 text-center">
           <p className="text-fg-muted">La tua partecipazione non è stata trovata su questo dispositivo.</p>
           <Button onClick={() => navigate(`/join/${room.invite_code}`)}>Rientra con l’invito</Button>
@@ -181,16 +190,25 @@ export default function RoomShell() {
     dataIncomplete,
     phase,
     refetch: () => void data.refetch(),
-    goTo: (section) => navigate(`/room/${room.id}/${section}`),
+    goTo: (section) =>
+      section === 'attivita'
+        ? navigate(`/room/${room.id}/attivita`)
+        : navigate(`/room/${room.id}?tab=${section}`, { replace: !onSubPage }),
+    openSwitcher: () => setSwitching(true),
   }
+  const openDelays = data.delayReports.filter((d) => !d.resolved_at).length
 
   return (
-    <div className="min-h-svh md:pl-[220px]">
-      <TripHeader room={room} phase={phase} memberCount={members.length} />
-      <main className="page-content mx-auto max-w-4xl px-4 pt-4 sm:px-6">
-        <Outlet context={context} />
-      </main>
-      <BottomNavigation roomId={room.id} active={active} />
+    <div className="fixed inset-0 flex flex-col bg-canvas">
+      <TripHeader
+        room={room}
+        alertCount={openDelays}
+        onAlerts={() => context.goTo('auto')}
+        onSwitch={() => setSwitching(true)}
+      />
+      {switcher}
+      <Outlet context={context} />
+      <BottomNavigation active={active} onSelect={(tab) => context.goTo(tab)} />
     </div>
   )
 }

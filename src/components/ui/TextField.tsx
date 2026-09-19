@@ -19,7 +19,7 @@ export default function TextField({ label, hint, error, id, className = '', ...p
         aria-describedby={hint || error ? `${fieldId}-help` : undefined}
         className={`min-h-12 w-full rounded-xl border border-line-strong bg-canvas px-3.5 py-3 text-base text-fg placeholder:text-fg-muted ${className}`}
       />
-      {(error || hint) && <p id={`${fieldId}-help`} className={`text-sm ${error ? 'text-danger' : 'text-fg-muted'}`}>{error || hint}</p>}
+      {(error || hint) && <p id={`${fieldId}-help`} className={`text-sm ${error ? 'text-danger-text' : 'text-fg-muted'}`}>{error || hint}</p>}
     </div>
   )
 }

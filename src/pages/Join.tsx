@@ -75,7 +75,7 @@ export default function Join() {
         title={isCrew ? 'Entra nella comitiva' : 'Entra nella stanza'}
       />
       <form onSubmit={handleJoin} className="flex flex-col gap-3 px-4 sm:px-6">
-        {error && <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">{error}</p>}
+        {error && <p className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger-text">{error}</p>}
         <input
           autoFocus
           required

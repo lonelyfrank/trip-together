@@ -34,6 +34,9 @@ interface SpeseTabProps {
   generalExpenses: GeneralExpense[]
   generalExpenseParticipants: GeneralExpenseParticipant[]
   settlements: ExpenseSettlement[]
+  /** Pannello "Nuova spesa" controllato da fuori (il bottone in testa alla tab). */
+  adding?: boolean
+  onAddingChange?: (open: boolean) => void
 }
 
 export default function SpeseTab({
@@ -46,8 +49,15 @@ export default function SpeseTab({
   generalExpenses,
   generalExpenseParticipants,
   settlements,
+  adding: addingProp,
+  onAddingChange,
 }: SpeseTabProps) {
-  const [adding, setAdding] = useState(false)
+  const [addingState, setAddingState] = useState(false)
+  const adding = addingProp ?? addingState
+  const setAdding = (open: boolean) => {
+    setAddingState(open)
+    onAddingChange?.(open)
+  }
   const [label, setLabel] = useState('')
   const [amount, setAmount] = useState('')
   const [paidBy, setPaidBy] = useState(currentMember.id)
@@ -162,12 +172,12 @@ export default function SpeseTab({
     <div className="space-y-3">
       {cars.length > 0 && (
         <div>
-          <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Per auto</p>
+          <p className="mb-2 text-[12.5px] font-bold text-fg">Per auto</p>
           <div className="space-y-2">
             {cars.map((c) => {
               const total = carExpenses.filter((e) => e.car_id === c.id).reduce((s, e) => s + e.amount, 0)
               return (
-                <div key={c.id} className="flex items-center justify-between rounded-xl bg-surface/60 px-3.5 py-2.5">
+                <div key={c.id} className="flex items-center justify-between rounded-card border border-line bg-surface shadow-card px-3.5 py-2.5">
                   <span className="text-[13px] text-fg">Auto di {memberById(c.driver_member_id)?.display_name}</span>
                   <span className="font-mono text-[13px] text-fg">{formatMoney(total)}</span>
                 </div>
@@ -178,24 +188,24 @@ export default function SpeseTab({
       )}
 
       <div>
-        <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Spese del gruppo</p>
+        <p className="mb-2 text-[12.5px] font-bold text-fg">Spese del gruppo</p>
         <div className="space-y-2">
           {generalExpenses.map((e) => {
             const participants = generalExpenseParticipants.filter((p) => p.expense_id === e.id)
             return (
-              <div key={e.id} className={`rounded-xl px-3.5 py-2.5 ${e.waived ? 'bg-surface/30 opacity-60' : 'bg-surface/60'}`}>
+              <div key={e.id} className={`rounded-card border border-line bg-surface px-3.5 py-2.5 shadow-card ${e.waived ? 'opacity-60' : ''}`}>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] text-fg">{e.label}</span>
                   <span className="font-mono text-[13px] text-fg">{formatMoney(e.amount)}</span>
                 </div>
-                <p className="mt-1 font-mono text-[10px] text-fg-muted">
+                <p className="mt-1 text-[10.5px] text-fg-muted">
                   pagato da {memberById(e.paid_by_member_id ?? '')?.display_name ?? '—'} · diviso tra {participants.length}
                   {e.waived && ` · condonato da ${memberById(e.waived_by_member_id ?? '')?.display_name ?? '?'}`}
                 </p>
                 {isCreator && !e.waived && (
                   <button
                     onClick={() => waiveExpense(e.id)}
-                    className="mt-1.5 font-mono text-[10px] text-fg-muted underline"
+                    className="mt-1.5 text-[10.5px] text-fg-muted underline"
                   >
                     condona questo debito
                   </button>
@@ -212,7 +222,7 @@ export default function SpeseTab({
       </Button>
       <BottomSheet open={adding} onClose={() => { if (!saving) setAdding(false) }} title={savedExpenseId ? 'Completa la spesa' : 'Nuova spesa'}>
         <form onSubmit={addExpense} className="space-y-5" aria-busy={saving}>
-          {saveError && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger">{saveError}</p>}
+          {saveError && <p role="alert" className="rounded-xl bg-danger/10 p-3 text-sm text-danger-text">{saveError}</p>}
           <fieldset disabled={saving || !!savedExpenseId} className="space-y-4 disabled:opacity-60">
             <TextField label="Per cosa avete speso?" autoFocus placeholder="Es. Spesa per il picnic" required maxLength={100} value={label} onChange={(event) => setLabel(event.target.value)} />
             <TextField label="Importo (€)" type="number" inputMode="decimal" step="0.01" min="0.01" required value={amount} onChange={(event) => setAmount(event.target.value)} />
@@ -225,10 +235,10 @@ export default function SpeseTab({
 
       {hasOpenBalance && (
         <div>
-          <p className="mb-2 mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Chi deve dare a chi</p>
+          <p className="mb-2 mt-2 text-[12.5px] font-bold text-fg">Chi deve dare a chi</p>
           <div className="space-y-1.5">
             {transfers.map((t, i) => (
-              <div key={i} className="rounded-xl bg-surface/60 px-3.5 py-2.5 text-[13px]">
+              <div key={i} className="rounded-card border border-line bg-surface shadow-card px-3.5 py-2.5 text-[13px]">
                 <div className="flex items-center justify-between">
                   <span className="text-fg">
                     {memberById(t.fromMemberId)?.display_name} → {memberById(t.toMemberId)?.display_name}
@@ -242,7 +252,7 @@ export default function SpeseTab({
                     setSettleNote('')
                     setSettling(t)
                   }}
-                  className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 font-mono text-[10px] text-accent underline"
+                  className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 text-[10.5px] text-brand-text underline"
                 >
                   <HandCoins size={13} /> segna come rimborsato
                 </button>
@@ -250,7 +260,7 @@ export default function SpeseTab({
             ))}
           </div>
           <div className="mt-3 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/10 px-4 py-3">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger-text" />
             <p className="text-[11px] leading-relaxed text-fg">
               Ci sono saldi non ancora chiusi. Non potrai chiudere la stanza finché tutti i conti non sono a zero.
             </p>
@@ -260,17 +270,17 @@ export default function SpeseTab({
 
       {settlements.length > 0 && (
         <div>
-          <p className="mb-2 mt-2 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Rimborsi registrati</p>
+          <p className="mb-2 mt-2 text-[12.5px] font-bold text-fg">Rimborsi registrati</p>
           <div className="space-y-1.5">
             {[...settlements].reverse().map((s) => (
-              <div key={s.id} className="rounded-xl bg-surface/60 px-3.5 py-2.5 text-[13px]">
+              <div key={s.id} className="rounded-card border border-line bg-surface shadow-card px-3.5 py-2.5 text-[13px]">
                 <div className="flex items-center justify-between">
                   <span className="text-fg">
                     {memberById(s.from_member_id)?.display_name ?? '—'} → {memberById(s.to_member_id)?.display_name ?? '—'}
                   </span>
                   <span className="font-mono text-fg">{formatMoney(s.amount)}</span>
                 </div>
-                <p className="mt-1 font-mono text-[10px] text-fg-muted">
+                <p className="mt-1 text-[10.5px] text-fg-muted">
                   registrato da {memberById(s.recorded_by)?.display_name ?? '—'}
                   {s.note && ` · ${s.note}`}
                 </p>
@@ -278,7 +288,7 @@ export default function SpeseTab({
                   <button
                     type="button"
                     onClick={() => undoSettlement(s.id)}
-                    className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 font-mono text-[10px] text-fg-muted underline"
+                    className="mt-1.5 inline-flex min-h-9 items-center gap-1.5 text-[10.5px] text-fg-muted underline"
                   >
                     <Undo2 size={13} /> annulla
                   </button>

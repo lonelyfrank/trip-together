@@ -67,7 +67,7 @@ export default function StopProposalsSection({
     <div className="space-y-2">
       {proposals.length > 0 && (
         <>
-          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">{title}</p>
+          <p className="text-[12.5px] font-bold text-fg">{title}</p>
           <div className="space-y-2">
             {proposals.map((p) => (
               <StopProposalCard

@@ -1,17 +1,18 @@
-import { CalendarPlus, Compass, Plus } from 'lucide-react'
+import { CalendarPlus, Plus } from 'lucide-react'
 import { type FormEvent, useMemo, useState } from 'react'
 import AlertBanner from '../../components/ui/AlertBanner'
 import BottomSheet from '../../components/ui/BottomSheet'
 import Button from '../../components/ui/Button'
 import EmptyState from '../../components/ui/EmptyState'
-import SectionHeader from '../../components/ui/SectionHeader'
+import PageTitle from '../../components/ui/PageTitle'
 import TextField from '../../components/ui/TextField'
 import ActivityCard from '../../components/room/ActivityCard'
+import { CATEGORY } from '../../components/room/activityCategories'
 import { useRoomContext } from '../../hooks/useRoomContext'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { dayKey, defaultDayKey, groupByDay } from '../../lib/activities'
 import { mutateNotify } from '../../lib/db'
-import { fromDatetimeLocal, toDatetimeLocal } from '../../lib/format'
+import { formatClock, fromDatetimeLocal, toDatetimeLocal } from '../../lib/format'
 import {
   deleteActivity,
   insertActivity,
@@ -162,14 +163,13 @@ export default function Activities() {
   }
 
   return (
-    <div className="space-y-5">
-      <SectionHeader
-        icon={Compass}
-        title="Attività"
+    <div className="space-y-4">
+      <PageTitle
+        title="Programma"
         hint="Il vostro itinerario, giorno per giorno"
         action={
-          <Button size="sm" onClick={openSheet}>
-            <Plus size={15} /> Aggiungi
+          <Button size="sm" variant="soft" className="!rounded-full" onClick={openSheet}>
+            <Plus size={15} strokeWidth={2.6} /> Aggiungi
           </Button>
         }
       />
@@ -178,10 +178,13 @@ export default function Activities() {
         <div
           role="tablist"
           aria-label="Giorni dell’itinerario"
-          className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0"
+          data-no-swipe
+          className="-mx-2.5 flex gap-2 overflow-x-auto px-2.5 pb-1"
         >
           {days.map((day) => {
             const isActive = day.key === activeDay?.key
+            const scheduled = days.filter((d) => d.key !== null)
+            const number = day.key === null ? null : scheduled.indexOf(day) + 1
             return (
               <button
                 key={day.key ?? 'senza-orario'}
@@ -189,14 +192,17 @@ export default function Activities() {
                 role="tab"
                 aria-selected={isActive}
                 onClick={() => setSelectedDay(day.key)}
-                className={`min-h-11 shrink-0 rounded-full border px-4 text-[13px] font-medium transition-colors ${
-                  isActive
-                    ? 'border-accent bg-accent text-on-accent'
-                    : 'border-line bg-surface text-fg-muted shadow-card'
+                className={`min-h-11 shrink-0 rounded-[14px] px-3.5 py-2 text-left transition-colors ${
+                  isActive ? 'bg-accent text-on-accent' : 'border border-line-strong bg-surface text-fg'
                 }`}
               >
-                {day.shortLabel}
-                <span className="ml-1.5 font-mono text-[11px] opacity-70">{day.activities.length}</span>
+                <span className="block text-[12px] font-bold">
+                  {number ? `Giorno ${number}` : 'Senza orario'}
+                  <span className="sr-only"> · {day.activities.length} tappe</span>
+                </span>
+                <span className={`block text-[10.5px] capitalize ${isActive ? 'opacity-90' : 'text-fg-muted'}`}>
+                  {day.key === null ? `${day.activities.length} tappe` : day.shortLabel}
+                </span>
               </button>
             )
           })}
@@ -221,22 +227,42 @@ export default function Activities() {
         />
       ) : (
         <>
-          {activeDay.label && <p className="text-[13px] text-fg-muted">{activeDay.label}</p>}
-          <ul className="space-y-2.5">
-            {activeDay.activities.map((activity) => (
-              <li key={activity.id}>
-                <ActivityCard
-                  activity={activity}
-                  participants={activityParticipants}
-                  members={members}
-                  currentMember={currentMember}
-                  onToggleGoing={toggleGoing}
-                  onSetStatus={changeStatus}
-                  onDelete={removeActivity}
-                />
-              </li>
-            ))}
-          </ul>
+          {activeDay.label && <p className="text-[12px] font-medium capitalize text-fg-muted">{activeDay.label}</p>}
+          <ol>
+            {activeDay.activities.map((activity, index) => {
+              const Icon = CATEGORY[activity.category].icon
+              const last = index === activeDay.activities.length - 1
+              return (
+                <li key={activity.id} className="flex gap-3">
+                  <div className="flex w-[38px] shrink-0 flex-col items-center">
+                    <span className="mb-1 text-[10.5px] font-bold tabular-nums text-fg-muted">
+                      {activity.starts_at ? formatClock(activity.starts_at) : '--:--'}
+                    </span>
+                    <span
+                      aria-hidden="true"
+                      className={`flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-full ${
+                        activity.status === 'annullata' ? 'bg-muted-soft text-fg-muted' : 'bg-accent-soft text-brand-text'
+                      }`}
+                    >
+                      <Icon size={13} strokeWidth={2.4} />
+                    </span>
+                    {!last && <span className="mt-1 w-0.5 flex-1 rounded-full bg-line-strong" />}
+                  </div>
+                  <div className={`min-w-0 flex-1 ${last ? '' : 'pb-3.5'}`}>
+                    <ActivityCard
+                      activity={activity}
+                      participants={activityParticipants}
+                      members={members}
+                      currentMember={currentMember}
+                      onToggleGoing={toggleGoing}
+                      onSetStatus={changeStatus}
+                      onDelete={removeActivity}
+                    />
+                  </div>
+                </li>
+              )
+            })}
+          </ol>
         </>
       )}
 

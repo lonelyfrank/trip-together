@@ -68,7 +68,7 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
           />
         </label>
         {error && (
-          <p className="rounded-lg bg-danger/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-danger">{error}</p>
+          <p className="rounded-lg bg-danger/10 px-3 py-2 text-[10.5px] leading-relaxed text-danger-text">{error}</p>
         )}
         <div className="flex items-center gap-2">
           <Button type="submit" variant="teal" size="sm" disabled={saving}>
@@ -81,7 +81,7 @@ export default function EventTimeRow({ room }: EventTimeRowProps) {
             <button
               type="button"
               onClick={() => persist(null)}
-              className="ml-auto font-mono text-[10px] text-fg-muted underline"
+              className="ml-auto text-[10.5px] text-fg-muted underline"
             >
               rimuovi
             </button>

@@ -3,7 +3,7 @@ import { useSyncExternalStore } from 'react'
 import { dismissToast, getToasts, subscribeToasts, type ToastKind } from '../../lib/toast'
 
 const ICON: Record<ToastKind, typeof Info> = { info: Info, error: AlertTriangle, success: Check }
-const ACCENT: Record<ToastKind, string> = { info: 'text-fg-muted', error: 'text-danger', success: 'text-accent' }
+const ACCENT: Record<ToastKind, string> = { info: 'text-fg-muted', error: 'text-danger-text', success: 'text-brand-text' }
 
 export default function Toaster() {
   const toasts = useSyncExternalStore(subscribeToasts, getToasts, getToasts)
@@ -31,7 +31,7 @@ export default function Toaster() {
                   t.action!.onClick()
                   dismissToast(t.id)
                 }}
-                className="shrink-0 text-[12px] font-medium text-accent"
+                className="shrink-0 text-[12px] font-medium text-brand-text"
               >
                 {t.action.label}
               </button>

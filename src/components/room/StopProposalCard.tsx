@@ -85,7 +85,7 @@ export default function StopProposalCard({ proposal, votes, eligibleMembers, cur
       )}
 
       <div className="flex items-center justify-between">
-        <span className="font-mono text-[10px] text-fg-muted">
+        <span className="text-[10.5px] text-fg-muted">
           {yes} sì · {no} no · {eligibleMembers.length} aventi diritto
         </span>
         {canVote && (

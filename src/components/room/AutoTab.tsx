@@ -199,11 +199,11 @@ export default function AutoTab({
 
         return (
           <Card key={car.id} tone={car.id === myCarId ? 'highlight' : 'surface'}>
-            {car.id === myCarId && <p className="mb-3 text-xs font-medium uppercase tracking-widest text-accent">La tua auto</p>}
+            {car.id === myCarId && <p className="mb-3 text-[10.5px] font-bold text-brand-text">La tua auto</p>}
             <div className="mb-2.5 flex items-start justify-between">
               <div>
                 <p className="font-serif text-[16px] leading-none text-fg">Auto di {driver?.display_name ?? '—'}</p>
-                <p className="mt-0.5 font-mono text-[10px] text-fg-muted">conducente</p>
+                <p className="mt-0.5 text-[10.5px] text-fg-muted">conducente</p>
               </div>
               <TravelStatusChip car={car} currentMemberId={currentMember.id} canEdit={iAmThisDriver || iAmInThisCar} />
             </div>
@@ -211,7 +211,7 @@ export default function AutoTab({
             <div className="mb-2.5 flex items-center justify-between">
               <Chip tone="teal">{passengers.length + 1}/{car.seats_total} posti</Chip>
               {iAmThisDriver && (
-                <button onClick={() => removeCar(car.id)} className="text-[10px] text-danger underline">
+                <button onClick={() => removeCar(car.id)} className="text-[10px] text-danger-text underline">
                   elimina
                 </button>
               )}
@@ -301,7 +301,7 @@ export default function AutoTab({
 
       {unassigned.length > 0 && (
         <div className="space-y-2">
-          <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Senza auto</p>
+          <p className="mb-1 mt-1 text-[12.5px] font-bold text-fg">Senza auto</p>
           {unassigned
             .filter((m) => !rideRequests.some((r) => r.member_id === m.id && r.status === 'pending'))
             .map((m) => (
@@ -365,14 +365,14 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
 
   return (
     <div className="border-t border-line pt-2.5">
-      <p className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-[0.15em] text-fg-muted">
+      <p className="mb-1.5 flex items-center gap-1.5 text-[12.5px] font-bold text-fg">
         <Package size={11} /> Carico di questa auto
       </p>
       <div className="space-y-1">
         {cargo.map((c) => (
           <button key={c.id} onClick={() => toggle(c)} className="flex w-full items-center gap-2 text-left text-[12px]">
             {c.packed ? (
-              <Check size={13} className="shrink-0 text-accent" />
+              <Check size={13} className="shrink-0 text-brand-text" />
             ) : (
               <Circle size={13} className="shrink-0 text-line-dashed" />
             )}
@@ -396,7 +396,7 @@ function CarCargoSection({ roomId, carId, cargo }: { roomId: string; carId: stri
       ) : (
         <button
           onClick={() => setAdding(true)}
-          className="mt-2 flex items-center gap-1 font-mono text-[10px] text-fg-muted active:opacity-60"
+          className="mt-2 flex items-center gap-1 text-[10.5px] text-fg-muted active:opacity-60"
         >
           <Plus size={11} /> aggiungi oggetto
         </button>

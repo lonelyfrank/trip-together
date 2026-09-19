@@ -1,7 +1,6 @@
 import { AlertTriangle, Check } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import Button from '../ui/Button'
-import Card from '../ui/Card'
 import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
 import { confirmMemberPresence } from '../../lib/mutations'
 import { readinessWindow } from '../../lib/readiness'
@@ -40,31 +39,32 @@ export default function ReadinessBanner({ room, currentMember, members, cars, ca
   }
 
   return (
-    <Card tone={win === 't2' ? 'surface' : 'highlight'} className={win === 't2' ? 'border-danger/25 bg-danger/10' : ''}>
-      <div className="mb-2 flex items-center gap-1.5">
-        <AlertTriangle size={13} className={win === 't2' ? 'text-danger' : 'text-warn'} />
-        <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-fg">
-          {win === 't2' ? 'Si parte tra meno di 2 ore' : 'Si parte tra meno di 24 ore'}
-        </span>
-      </div>
+    <section
+      aria-label="Partenza vicina"
+      className={`rounded-card border px-[9px] py-2 ${win === 't2' ? 'border-danger/15 bg-danger-soft' : 'border-warning/20 bg-warning-soft'}`}
+    >
+      <p className={`flex items-center gap-1.5 text-[11.5px] font-bold ${win === 't2' ? 'text-danger-text' : 'text-warn'}`}>
+        <AlertTriangle aria-hidden="true" size={14} />
+        {win === 't2' ? 'Si parte tra meno di 2 ore' : 'Si parte tra meno di 24 ore'}
+      </p>
 
-      <p className="mb-1 text-[13px] text-fg-muted">
+      <p className="mt-0.5 text-[10.5px] text-fg-muted">
         {confirmedCount}/{members.length} confermati
         {withoutCarCount > 0 && ` · ${withoutCarCount} senza auto assegnata`}
       </p>
 
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 [&:not(:empty)]:mt-2">
         {!currentMember.confirmed && (
           <Button size="sm" variant="teal" onClick={confirmPresence}>
             <Check size={12} /> Conferma la tua presenza
           </Button>
         )}
         {amIWithoutCar && (
-          <Button size="sm" variant="outline" onClick={onGoToAuto}>
+          <Button size="sm" variant="surface" onClick={onGoToAuto}>
             Cerca un passaggio
           </Button>
         )}
       </div>
-    </Card>
+    </section>
   )
 }

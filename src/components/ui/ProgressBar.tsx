@@ -1,7 +1,7 @@
 const TONES = {
-  accent: 'bg-accent',
-  ok: 'bg-ok',
-  warn: 'bg-warn',
+  accent: 'bg-brand',
+  ok: 'bg-brand',
+  warn: 'bg-warning',
 } as const
 
 interface ProgressBarProps {
@@ -9,10 +9,12 @@ interface ProgressBarProps {
   max: number
   tone?: keyof typeof TONES
   label?: string
+  /** Altezza in px: 13 nel saldo di Spese, 6 nelle card piccole. */
+  height?: number
   className?: string
 }
 
-export default function ProgressBar({ value, max, tone = 'accent', label, className = '' }: ProgressBarProps) {
+export default function ProgressBar({ value, max, tone = 'accent', label, height = 6, className = '' }: ProgressBarProps) {
   const percent = max > 0 ? Math.max(0, Math.min(100, (value / max) * 100)) : 0
   return (
     <div
@@ -21,9 +23,13 @@ export default function ProgressBar({ value, max, tone = 'accent', label, classN
       aria-valuemin={0}
       aria-valuemax={100}
       aria-label={label}
-      className={`h-2 overflow-hidden rounded-full bg-canvas ${className}`}
+      className={`relative overflow-hidden rounded-full bg-track ${className}`}
+      style={{ height }}
     >
-      <div className={`h-full rounded-full transition-[width] duration-200 ${TONES[tone]}`} style={{ width: `${percent}%` }} />
+      <div
+        className={`absolute inset-y-0 left-0 rounded-full transition-[width] duration-500 ease-out ${TONES[tone]}`}
+        style={{ width: `${percent}%` }}
+      />
     </div>
   )
 }

@@ -453,13 +453,20 @@ Il tema scuro conserva esattamente la palette obsidian originale:
 | `teal` | accento (positivo / attivo) | `#46d9c9` |
 | `coral` | alert (saldi aperti, ritardi, errori) | `#e76f51` |
 
-Font (Google Fonts, in `index.html`): tutto **Roboto**. `font-sans` = corpo;
-`font-serif` = Roboto con `font-weight:700` e tracking stretto (titoli: mantiene
-la gerarchia senza una seconda famiglia); `font-mono` = Roboto Mono per
-dati/importi/codici/eyebrow, dove serve allineamento tabellare.
+Font (Google Fonts, in `index.html`): tutto **Plus Jakarta Sans**, come nel
+mockup del canvas Design "Trip Together" (2026-09-18). `font-sans` = corpo;
+`font-serif` = stessa famiglia a `font-weight:800` con tracking stretto;
+`font-mono` = stessa famiglia con cifre tabulari (importi, orari, codici).
 
-**Componenti in `src/components/ui/`:** `ScreenHeader` (eyebrow mono + titolo +
-azione), `Chip` (`muted|amber|teal|alert`), `Card` (`surface|highlight|flat|dashed`,
+Tema chiaro = scala slate del mockup (`canvas #f4f6f9`, `fg #0f172a`). Il verde
+del mockup `#10b981` è il token `brand` e si usa **solo** per segni grafici
+(pallini, barre, logo): con testo bianco sta a 2.5:1. Testo e bottoni usano
+`accent #047857` (5.5:1). Tinte tenui di chip e avvisi: `*-soft`.
+Pattern delle viste stanza: `PageTitle` in testa, card compatte a due colonne
+con `CardTitle` (icona colorata + titolo + contatore), sezioni complete sotto.
+
+**Componenti in `src/components/ui/`:** `ScreenHeader` (eyebrow + titolo +
+azione), `PageTitle`, `CardTitle`, `Chip` (`muted|amber|teal|alert`), `Card` (`surface|highlight|flat|dashed`,
 tappabile con `onClick`), `Button` (`primary|teal|outline|surface`, `md|sm`),
 `TextField` (label + hint), `BottomSheet` (`<dialog>` nativo, dal basso su mobile e
 centrato su desktop, focus confinato, Escape, ritorno del focus), `Skeleton`,

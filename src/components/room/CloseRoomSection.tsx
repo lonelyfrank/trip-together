@@ -88,13 +88,13 @@ export default function CloseRoomSection({
     <Card tone={hasOpenBalance ? 'surface' : 'highlight'} className="mt-1">
       <div className="mb-2 flex items-center gap-1.5 text-fg-muted">
         <Lock size={13} strokeWidth={2.5} />
-        <span className="text-xs font-medium uppercase tracking-widest">Archivia evento</span>
+        <span className="text-[12.5px] font-bold">Archivia evento</span>
       </div>
 
       {hasOpenBalance ? (
         <>
           <div className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/10 px-4 py-3">
-            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />
+            <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger-text" />
             <p className="text-[11px] leading-relaxed text-fg">
               Ci sono {transfers.length} saldi aperti. Controlla il riepilogo prima di archiviare.
             </p>
@@ -116,7 +116,7 @@ export default function CloseRoomSection({
       )}
       <BottomSheet open={confirming} onClose={() => { if (!closing) setConfirming(false) }} title="Archivia questo evento?">
         <p className="mb-5 text-sm leading-relaxed text-fg-muted">Potrai rileggere il riepilogo dalla Home. Nell’archivio le modifiche non saranno disponibili.</p>
-        {error && <p role="alert" className="mb-4 text-sm text-danger">{error}</p>}
+        {error && <p role="alert" className="mb-4 text-sm text-danger-text">{error}</p>}
         <Button className="w-full" onClick={handleClose} disabled={closing || !online || hasOpenBalance}>{closing ? 'Archiviazione…' : 'Conferma archiviazione'}</Button>
       </BottomSheet>
     </Card>

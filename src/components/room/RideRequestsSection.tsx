@@ -77,7 +77,7 @@ export default function RideRequestsSection({
         (myRequest ? (
           <div className="flex items-center justify-between rounded-xl border border-accent/25 bg-accent/10 px-3.5 py-2.5">
             <span className="text-[12px] text-fg">In attesa di un passaggio...</span>
-            <button onClick={cancelRequest} className="font-mono text-[10px] text-fg-muted underline">
+            <button onClick={cancelRequest} className="text-[10.5px] text-fg-muted underline">
               annulla
             </button>
           </div>
@@ -89,7 +89,7 @@ export default function RideRequestsSection({
 
       {othersWaiting.length > 0 && (
         <>
-          <p className="mb-1 mt-1 font-mono text-[10px] uppercase tracking-[0.2em] text-fg-muted">Cercano un passaggio</p>
+          <p className="mb-1 mt-1 text-[12.5px] font-bold text-fg">Cercano un passaggio</p>
           <div className="space-y-1.5">
             {othersWaiting.map((r) => {
               const member = memberById(r.member_id)

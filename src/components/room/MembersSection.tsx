@@ -1,20 +1,25 @@
-import { Check, LifeBuoy, Share2 } from 'lucide-react'
+import { Check, ChevronRight, LifeBuoy, Share2, UsersRound } from 'lucide-react'
 import { useState } from 'react'
 import Avatar from '../ui/Avatar'
+import BottomSheet from '../ui/BottomSheet'
 import Button from '../ui/Button'
+import Card from '../ui/Card'
+import CardTitle from '../ui/CardTitle'
 import Chip from '../ui/Chip'
-import SectionHeader from '../ui/SectionHeader'
 import { encodeResumeToken } from '../../lib/resumeToken'
 import { shareOrCopy } from '../../lib/share'
 import type { Car, CarPassenger, Member, Room } from '../../types'
 
-// Estratto da StanzaTab: la lista partecipanti appartiene alla sezione Gruppo,
-// non alla panoramica dell'evento.
-
-function roleLabel(memberId: string, cars: Car[], carPassengers: CarPassenger[]): string {
-  if (cars.some((c) => c.driver_member_id === memberId)) return 'guida'
-  if (carPassengers.some((cp) => cp.member_id === memberId)) return 'passeggero'
-  return 'senza auto'
+// "Membri del gruppo" del mockup: una griglia di volti con il ruolo di
+// ciascuno. I ruoli sono quelli che il database conosce davvero — chi ha
+// creato l'evento, chi guida, chi non ha ancora confermato — non incarichi
+// inventati come "Alloggio" o "Snack".
+function roleOf(member: Member, cars: Car[], carPassengers: CarPassenger[]) {
+  if (!member.confirmed) return { label: 'In attesa', tone: 'warn' as const }
+  if (member.role === 'creator') return { label: 'Organizza', tone: 'ok' as const }
+  if (cars.some((c) => c.driver_member_id === member.id)) return { label: 'Autista', tone: 'info' as const }
+  if (carPassengers.some((cp) => cp.member_id === member.id)) return { label: 'Passeggero', tone: 'muted' as const }
+  return { label: 'Senza auto', tone: 'muted' as const }
 }
 
 interface MembersSectionProps {
@@ -35,6 +40,7 @@ export default function MembersSection({
   canInvite,
 }: MembersSectionProps) {
   const [shared, setShared] = useState(false)
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
   const [recoveryCopiedFor, setRecoveryCopiedFor] = useState<string | null>(null)
 
   const confirmedCount = members.filter((m) => m.confirmed).length
@@ -68,59 +74,88 @@ export default function MembersSection({
   }
 
   return (
-    <section aria-label="Partecipanti">
-      <SectionHeader
+    <Card>
+      <CardTitle
+        as="h2"
+        icon={UsersRound}
         title="Membri del gruppo"
-        hint={`${confirmedCount} di ${members.length} hanno confermato`}
+        action={
+          <span className="text-[11.5px] font-bold text-brand-text">
+            {confirmedCount} di {members.length} confermati
+          </span>
+        }
       />
-      <ul className="space-y-1.5">
-        {members.map((m) => (
-          <li
-            key={m.id}
-            className="flex items-center justify-between gap-3 rounded-2xl border border-line bg-surface px-3 py-2.5 shadow-card"
-          >
-            <div className="flex min-w-0 items-center gap-2.5">
-              <Avatar name={m.display_name} seed={m.id} />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-fg">
-                  {m.display_name}
-                  {m.id === currentMember.id && <span className="font-normal text-fg-muted"> (tu)</span>}
-                </p>
-                <p className="text-[12px] text-fg-muted">{roleLabel(m.id, cars, carPassengers)}</p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1.5">
-              {m.confirmed ? (
-                <Chip tone="ok">
-                  <Check aria-hidden="true" size={11} /> ok
-                </Chip>
-              ) : (
-                <Chip tone="warn">in attesa</Chip>
-              )}
+      <ul className="grid grid-cols-3 gap-x-2 gap-y-3 sm:grid-cols-6">
+        {members.map((m) => {
+          const role = roleOf(m, cars, carPassengers)
+          return (
+            <li key={m.id} className="flex min-w-0 flex-col items-center gap-1 text-center">
+              <Avatar
+                name={m.display_name}
+                seed={m.id}
+                size="lg"
+                className={m.confirmed ? '' : 'opacity-60'}
+              />
+              <span className="w-full truncate text-[12px] font-bold text-fg">
+                {m.display_name}
+                {m.id === currentMember.id && <span className="font-medium text-fg-muted"> (tu)</span>}
+              </span>
+              <Chip tone={role.tone} className="!px-2 !py-0.5 !text-[9.5px]">
+                {role.label}
+              </Chip>
+            </li>
+          )
+        })}
+      </ul>
+
+      <div className="mt-3.5 grid grid-cols-2 gap-2 border-t border-line pt-3">
+        {canInvite && (
+          <Button size="sm" variant="soft" onClick={invite}>
+            {shared ? <Check size={14} /> : <Share2 size={14} />}
+            {shared ? 'Link copiato!' : 'Invita amici'}
+          </Button>
+        )}
+        <Button
+          size="sm"
+          variant="surface"
+          className={canInvite ? '' : 'col-span-2'}
+          onClick={() => setRecoveryOpen(true)}
+        >
+          <LifeBuoy size={14} /> Link di recupero
+        </Button>
+      </div>
+
+      <BottomSheet open={recoveryOpen} onClose={() => setRecoveryOpen(false)} title="Link di recupero">
+        <p className="mb-3 text-[13px] leading-relaxed text-fg-muted">
+          Chi cambia telefono o cancella il browser rientra con il suo link, senza account.
+        </p>
+        <ul className="space-y-1.5">
+          {members.map((m) => (
+            <li key={m.id}>
               <button
                 type="button"
                 onClick={() => shareRecoveryLink(m)}
-                title={`Link di recupero per ${m.display_name}`}
-                aria-label={`Link di recupero per ${m.display_name}`}
-                className="flex h-11 w-11 items-center justify-center rounded-full text-fg-muted transition-colors active:text-accent"
+                className="flex min-h-12 w-full items-center justify-between gap-3 rounded-2xl bg-canvas px-3.5 py-2 text-left"
               >
+                <span className="flex min-w-0 items-center gap-2.5">
+                  <Avatar name={m.display_name} seed={m.id} size="sm" />
+                  <span className="truncate text-[13px] font-semibold text-fg">
+                    {m.display_name}
+                    {m.id === currentMember.id && <span className="font-normal text-fg-muted"> (tu)</span>}
+                  </span>
+                </span>
                 {recoveryCopiedFor === m.id ? (
-                  <Check size={15} className="text-accent" />
+                  <span className="flex shrink-0 items-center gap-1 text-[12px] font-bold text-brand-text">
+                    <Check aria-hidden="true" size={14} /> Copiato
+                  </span>
                 ) : (
-                  <LifeBuoy size={15} />
+                  <ChevronRight aria-hidden="true" size={16} className="shrink-0 text-fg-muted" />
                 )}
               </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-
-      {canInvite && (
-        <Button variant="surface" className="mt-3 w-full" onClick={invite}>
-          {shared ? <Check size={15} /> : <Share2 size={15} />}
-          {shared ? 'Link copiato!' : 'Invita amici'}
-        </Button>
-      )}
-    </section>
+            </li>
+          ))}
+        </ul>
+      </BottomSheet>
+    </Card>
   )
 }

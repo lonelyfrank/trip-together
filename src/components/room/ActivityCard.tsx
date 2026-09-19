@@ -1,30 +1,13 @@
-import {
-  CalendarClock,
-  Check,
-  GlassWater,
-  Landmark,
-  MapPin,
-  Mountain,
-  Trash2,
-  Umbrella,
-  UtensilsCrossed,
-} from 'lucide-react'
+import { CalendarClock, Check, MapPin, Trash2 } from 'lucide-react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
 import Chip from '../ui/Chip'
 import { AvatarGroup } from '../ui/Avatar'
+import { CATEGORY } from './activityCategories'
 import { activityInterest } from '../../lib/activities'
 import { formatMoney } from '../../lib/format'
 import type { Activity, ActivityParticipant, ActivityStatus, Member } from '../../types'
 
-const CATEGORY = {
-  mare: { icon: Umbrella, label: 'Mare' },
-  cibo: { icon: UtensilsCrossed, label: 'Cibo' },
-  cultura: { icon: Landmark, label: 'Cultura' },
-  drink: { icon: GlassWater, label: 'Drink' },
-  panorama: { icon: Mountain, label: 'Panorama' },
-  altro: { icon: MapPin, label: 'Altro' },
-} as const
 
 // "Da votare" e "In attesa" dei mockup non sono stati salvati: una tappa
 // `proposta` è "da votare" finché il gruppo non è in maggioranza, e da lì si
@@ -36,11 +19,6 @@ const STATUS: Record<ActivityStatus, { label: string; tone: 'muted' | 'ok' | 'wa
   annullata: { label: 'Annullata', tone: 'danger' },
 }
 
-function timeLabel(activity: Activity): string {
-  if (!activity.starts_at) return 'Da programmare'
-  const time = new Date(activity.starts_at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-  return activity.duration_minutes ? `${time} · ~${activity.duration_minutes} min` : time
-}
 
 interface ActivityCardProps {
   activity: Activity
@@ -71,51 +49,57 @@ export default function ActivityCard({
   const canDecide = currentMember.role === 'creator' || activity.created_by === currentMember.id
 
   return (
-    <Card tone={cancelled ? 'flat' : 'surface'}>
-      <div className="flex items-start gap-3">
+    <Card tone={cancelled ? 'flat' : 'surface'} className="!p-3">
+      <div className="flex gap-2.5">
         <span
           aria-hidden="true"
-          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-accent-soft text-accent"
+          className={`flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white ${meta.tile} ${cancelled ? 'opacity-40' : ''}`}
         >
-          <Icon size={19} />
+          <Icon size={24} />
         </span>
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <p className={`min-w-0 text-[15px] font-semibold ${cancelled ? 'text-fg-muted line-through' : 'text-fg'}`}>
+          <div className="flex items-start justify-between gap-1.5">
+            <p className={`min-w-0 text-[13px] font-bold leading-snug ${cancelled ? 'text-fg-muted line-through' : 'text-fg'}`}>
               {activity.title}
             </p>
-            <Chip tone={status.tone}>{status.label}</Chip>
+            <Chip tone={status.tone} className="shrink-0 !px-2 !py-0.5 !text-[9.5px]">
+              {status.label}
+            </Chip>
           </div>
-          <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px] text-fg-muted">
-            <span className="flex items-center gap-1">
-              <CalendarClock aria-hidden="true" size={13} /> {timeLabel(activity)}
-            </span>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5 text-[10.5px] text-fg-muted">
             {activity.place_label && (
               <span className="flex min-w-0 items-center gap-1">
-                <MapPin aria-hidden="true" size={13} />
+                <MapPin aria-hidden="true" size={11} className="shrink-0" />
                 <span className="truncate">{activity.place_label}</span>
               </span>
             )}
-            {activity.price_per_person !== null && (
-              <span className="font-mono">{formatMoney(activity.price_per_person)} a testa</span>
+            {activity.duration_minutes && (
+              <span className="flex items-center gap-1">
+                <CalendarClock aria-hidden="true" size={11} /> circa {activity.duration_minutes} min
+              </span>
             )}
           </p>
-          {activity.note && <p className="mt-1.5 text-[13px] leading-relaxed text-fg-muted">{activity.note}</p>}
+          {activity.note && <p className="mt-0.5 text-[11px] leading-relaxed text-fg-muted">{activity.note}</p>}
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           {goingMembers.length > 0 ? (
             <>
-              <AvatarGroup people={goingMembers} max={5} />
-              <span className="text-[12px] text-fg-muted">
+              <AvatarGroup people={goingMembers} max={3} size="xs" />
+              <span className="text-[11px] text-fg-muted">
                 {going.length} su {members.length}
-                {hasMajority && activity.status === 'proposta' && ' · c’è la maggioranza'}
+                {hasMajority && activity.status === 'proposta' && ' · maggioranza'}
               </span>
             </>
           ) : (
-            <span className="text-[12px] text-fg-muted">Nessuno si è ancora aggiunto</span>
+            <span className="text-[11px] text-fg-muted">Nessuno si è ancora aggiunto</span>
+          )}
+          {activity.price_per_person !== null && (
+            <span className="text-[11px] font-bold text-fg">
+              {formatMoney(activity.price_per_person)} <span className="font-medium text-fg-muted">a persona</span>
+            </span>
           )}
         </div>
 
@@ -123,7 +107,7 @@ export default function ActivityCard({
           <div className="flex shrink-0 flex-wrap items-center gap-1.5">
             <Button
               size="sm"
-              variant={iAmGoing ? 'teal' : 'outline'}
+              variant={iAmGoing ? 'soft' : activity.status === 'proposta' ? 'primary' : 'outline'}
               aria-pressed={iAmGoing}
               onClick={() => onToggleGoing(activity, !iAmGoing)}
             >
@@ -131,6 +115,8 @@ export default function ActivityCard({
                 <>
                   <Check size={14} /> Ci sono
                 </>
+              ) : activity.status === 'proposta' ? (
+                'Vota'
               ) : (
                 'Mi aggiungo'
               )}
@@ -150,7 +136,7 @@ export default function ActivityCard({
                 type="button"
                 onClick={() => onDelete(activity)}
                 aria-label={`Elimina ${activity.title}`}
-                className="flex h-11 w-11 items-center justify-center rounded-full text-fg-muted active:text-danger"
+                className="flex h-11 w-11 items-center justify-center rounded-full text-fg-muted active:text-danger-text"
               >
                 <Trash2 aria-hidden="true" size={15} />
               </button>

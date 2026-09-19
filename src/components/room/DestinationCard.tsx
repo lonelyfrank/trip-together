@@ -1,8 +1,7 @@
-import { Check, Crosshair, MapPin, Navigation } from 'lucide-react'
+import { Check, Crosshair, MapPin } from 'lucide-react'
 import { type FormEvent, useState } from 'react'
 import Button from '../ui/Button'
 import Card from '../ui/Card'
-import MapSheet from '../MapSheet'
 import EventTimeRow from './EventTimeRow'
 import WeatherStrip from './WeatherStrip'
 import { mutate } from '../../lib/db'
@@ -21,7 +20,6 @@ type LinkStatus =
   | { kind: 'error' }
 
 export default function DestinationCard({ room }: DestinationCardProps) {
-  const [mapOpen, setMapOpen] = useState(false)
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(room.destination_label ?? '')
   const [lat, setLat] = useState<number | null>(room.destination_lat)
@@ -116,10 +114,10 @@ export default function DestinationCard({ room }: DestinationCardProps) {
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-1.5 text-warn">
           <MapPin size={13} strokeWidth={2.5} />
-          <span className="font-mono text-[10px] uppercase tracking-[0.18em]">Destinazione</span>
+          <span className="text-[11px] font-bold">Destinazione</span>
         </div>
         {!editing && (
-          <button onClick={startEditing} className="font-mono text-[10px] text-fg-muted underline">
+          <button onClick={startEditing} className="text-[10.5px] text-fg-muted underline">
             modifica
           </button>
         )}
@@ -144,17 +142,17 @@ export default function DestinationCard({ room }: DestinationCardProps) {
               inputMode="url"
             />
             {linkStatus.kind === 'ok' && (
-              <p className="flex items-center gap-1 font-mono text-[10px] text-accent">
+              <p className="flex items-center gap-1 text-[10.5px] text-brand-text">
                 <Check size={11} /> Posizione trovata: {linkStatus.lat.toFixed(5)}, {linkStatus.lng.toFixed(5)}
               </p>
             )}
             {linkStatus.kind === 'shortlink' && (
-              <p className="font-mono text-[10px] text-warn">
+              <p className="text-[10.5px] text-warn">
                 È un link accorciato: aprilo, poi incolla il link completo (o le coordinate).
               </p>
             )}
             {linkStatus.kind === 'error' && (
-              <p className="font-mono text-[10px] text-danger">Link non riconosciuto. Prova con le coordinate "lat, lng".</p>
+              <p className="text-[10.5px] text-danger-text">Link non riconosciuto. Prova con le coordinate "lat, lng".</p>
             )}
           </div>
 
@@ -163,13 +161,13 @@ export default function DestinationCard({ room }: DestinationCardProps) {
           </Button>
 
           {lat !== null && lng !== null && linkStatus.kind === 'idle' && (
-            <p className="font-mono text-[10px] text-fg-muted">
+            <p className="text-[10.5px] text-fg-muted">
               Coordinate attuali: {lat.toFixed(5)}, {lng.toFixed(5)}
             </p>
           )}
 
           {saveError && (
-            <p className="rounded-lg bg-danger/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-danger">
+            <p className="rounded-lg bg-danger/10 px-3 py-2 text-[10.5px] leading-relaxed text-danger-text">
               {saveError}
             </p>
           )}
@@ -190,16 +188,7 @@ export default function DestinationCard({ room }: DestinationCardProps) {
           </p>
           <EventTimeRow room={room} />
           {hasCoords && (
-            <>
-              <WeatherStrip
-                lat={room.destination_lat!}
-                lng={room.destination_lng!}
-                eventTime={room.event_time}
-              />
-              <Button className="mt-3 w-full" onClick={() => setMapOpen(true)}>
-                <Navigation size={14} /> Avvia percorso
-              </Button>
-            </>
+            <WeatherStrip lat={room.destination_lat!} lng={room.destination_lng!} eventTime={room.event_time} />
           )}
         </>
       ) : (
@@ -211,14 +200,6 @@ export default function DestinationCard({ room }: DestinationCardProps) {
         </>
       )}
 
-      {hasCoords && (
-        <MapSheet
-          open={mapOpen}
-          onClose={() => setMapOpen(false)}
-          lat={room.destination_lat!}
-          lng={room.destination_lng!}
-        />
-      )}
     </Card>
   )
 }

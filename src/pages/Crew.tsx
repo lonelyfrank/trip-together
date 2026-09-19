@@ -46,7 +46,7 @@ export default function CrewPage() {
   if (loadError) {
     return (
       <div className="mx-auto flex min-h-svh max-w-4xl flex-col items-center justify-center gap-4 px-6 text-center">
-        <p className="text-danger">Non riusciamo a caricare la comitiva.</p>
+        <p className="text-danger-text">Non riusciamo a caricare la comitiva.</p>
         <p className="text-sm text-fg-muted">Controlla la connessione e riprova.</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
           Riprova
@@ -139,7 +139,7 @@ export default function CrewPage() {
 
       <div className="page-content flex-1 space-y-7 px-4 sm:px-6">
         {error && !creating && (
-          <p role="alert" className="rounded-2xl border border-danger/25 bg-danger/10 p-4 text-sm text-danger">
+          <p role="alert" className="rounded-2xl border border-danger/25 bg-danger/10 p-4 text-sm text-danger-text">
             {error}
           </p>
         )}
@@ -237,7 +237,7 @@ export default function CrewPage() {
       <BottomSheet open={creating} onClose={() => { if (!submitting) setCreating(false) }} title="Nuovo evento">
         <form onSubmit={createEvent} className="space-y-5" aria-busy={submitting}>
           {error && (
-            <p role="alert" className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger">
+            <p role="alert" className="rounded-xl bg-danger/10 px-4 py-2 text-sm text-danger-text">
               {error}
             </p>
           )}

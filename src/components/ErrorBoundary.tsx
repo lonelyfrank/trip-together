@@ -29,7 +29,7 @@ export default class ErrorBoundary extends Component<Props, State> {
 
     return (
       <div className="mx-auto flex min-h-svh max-w-lg flex-col items-center justify-center gap-4 bg-canvas px-6 text-center">
-        <p className="text-danger">Qualcosa è andato storto.</p>
+        <p className="text-danger-text">Qualcosa è andato storto.</p>
         <p className="font-mono text-[11px] text-fg-muted">{this.state.error.message}</p>
         <Button variant="outline" onClick={() => window.location.reload()}>
           Ricarica

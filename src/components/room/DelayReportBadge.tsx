@@ -5,14 +5,9 @@ import Button from '../ui/Button'
 import { mutateNotify } from '../../lib/db'
 import { insertDelayReport, resolveDelayReport } from '../../lib/mutations'
 import { formatRelativeTime } from '../../lib/time'
+import { REASON_LABELS } from '../../lib/delays'
 import type { DelayReason, DelayReport } from '../../types'
 
-const REASON_LABELS: Record<DelayReason, string> = {
-  traffico: 'Traffico',
-  benzina: 'Rifornimento',
-  dimenticanza: 'Dimenticanza',
-  altro: 'Altro',
-}
 
 const REASONS: DelayReason[] = ['traffico', 'benzina', 'dimenticanza', 'altro']
 
@@ -60,17 +55,17 @@ export default function DelayReportBadge({ carId, currentMemberId, canReport, ac
     return (
       <div className="flex items-center justify-between rounded-xl border border-danger/25 bg-danger/10 px-3.5 py-2.5">
         <div className="flex items-center gap-2">
-          <AlertTriangle size={13} className="shrink-0 text-danger" />
+          <AlertTriangle size={13} className="shrink-0 text-danger-text" />
           <div>
             <p className="text-[12px] text-fg">
               Ritardo: {REASON_LABELS[activeDelay.reason]}
               {activeDelay.minutes_estimate ? ` · ~${activeDelay.minutes_estimate} min` : ''}
             </p>
-            <p className="font-mono text-[10px] text-fg-muted">segnalato {formatRelativeTime(activeDelay.created_at)}</p>
+            <p className="text-[10.5px] text-fg-muted">segnalato {formatRelativeTime(activeDelay.created_at)}</p>
           </div>
         </div>
         {canReport && (
-          <button onClick={resolve} className="shrink-0 font-mono text-[10px] text-fg-muted underline">
+          <button onClick={resolve} className="shrink-0 text-[10.5px] text-fg-muted underline">
             risolto
           </button>
         )}

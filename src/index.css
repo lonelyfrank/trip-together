@@ -1,123 +1,136 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Token semantici a doppio tema.
-
-   `@theme inline` è obbligatorio: i token di `@theme` vengono risolti in
-   fase di build, quindi le utility devono puntare alle variabili --tt-*
-   (ridefinibili a runtime) e non ai valori. Senza `inline` il tema non
-   sarebbe commutabile.
-
-   La palette "obsidian" originale sopravvive come tema scuro, ma i suoi
-   nomi (ink, cream, amber, teal…) non esistono più come utility: erano
-   alias di transizione, rimossi a migrazione completata. Una classe
-   inesistente non è un errore in Tailwind — viene scartata in silenzio —
-   quindi non reintrodurli.
+   Design token del mockup Trip Together (handoff Claude Design, 2026-09).
+   Tutti i colori dell'interfaccia passano da qui: i componenti usano solo
+   le utility generate da `@theme inline` (bg-brand-soft, text-fg-muted…),
+   mai hex scritti a mano. `inline` fa puntare le utility alle variabili
+   --tt-*, così un valore si corregge in un posto solo.
+   Una classe inesistente non è un errore in Tailwind — viene scartata in
+   silenzio — quindi non reintrodurre i nomi della vecchia palette scura
+   (ink, cream, amber, teal).
    ═══════════════════════════════════════════════════════════════════════ */
-
 @theme inline {
-  --font-sans: 'Roboto', ui-sans-serif, system-ui, sans-serif;
-  /* Titoli/heading: sempre Roboto, distinti solo dal peso (vedi .font-serif sotto). */
-  --font-serif: 'Roboto', ui-sans-serif, system-ui, sans-serif;
-  /* Dati/codici/importi: Roboto Mono per allineamento tabellare. */
-  --font-mono: 'Roboto Mono', ui-monospace, SFMono-Regular, monospace;
+  --font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  /* Titoli: stessa famiglia del corpo, distinti dal peso (vedi .font-serif). */
+  --font-serif: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  /* Importi e codici: stessa famiglia, cifre tabulari (vedi .font-mono). */
+  --font-mono: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', system-ui, sans-serif;
+  /* Solo testi decorativi scritti a mano ("Buon viaggio insieme ♡"). */
+  --font-hand: 'Caveat', 'Segoe Script', cursive;
 
   /* Superfici e testo */
-  --color-canvas: var(--tt-canvas);
+  --color-canvas: var(--tt-app-bg);
   --color-surface: var(--tt-surface);
-  --color-overlay: var(--tt-overlay);
-  --color-fg: var(--tt-fg);
-  --color-fg-muted: var(--tt-fg-muted);
+  --color-overlay: var(--tt-surface);
+  --color-fg: var(--tt-text);
+  --color-fg-muted: var(--tt-text-secondary);
+  --color-fg-soft: var(--tt-text-soft);
   --color-line: var(--tt-line);
   --color-line-strong: var(--tt-line-strong);
   --color-line-dashed: var(--tt-line-dashed);
+  --color-divider: var(--tt-divider);
 
-  /* Accento e colori semantici */
-  --color-accent: var(--tt-accent);
-  --color-on-accent: var(--tt-on-accent);
-  --color-accent-soft: var(--tt-accent-soft);
-  --color-ok: var(--tt-ok);
-  --color-warn: var(--tt-warn);
+  /* Marca */
+  --color-brand: var(--tt-brand);
+  --color-brand-button: var(--tt-brand-button);
+  --color-brand-button-top: var(--tt-brand-button-top);
+  --color-brand-text: var(--tt-brand-text);
+  --color-brand-soft: var(--tt-brand-soft);
+  --color-brand-tint: var(--tt-brand-tint);
+
+  /* Colori di categoria */
+  --color-blue: var(--tt-blue);
+  --color-blue-soft: var(--tt-blue-soft);
+  --color-purple: var(--tt-purple);
+  --color-purple-soft: var(--tt-purple-soft);
+  --color-warning: var(--tt-warning);
+  --color-warning-text: var(--tt-warning-text);
+  --color-warning-soft: var(--tt-warning-soft);
+  --color-note-soft: var(--tt-note-soft);
   --color-danger: var(--tt-danger);
-  --color-info: var(--tt-info);
+  --color-danger-text: var(--tt-danger-text);
+  --color-danger-soft: var(--tt-danger-soft);
+  --color-grey-soft: var(--tt-grey-soft);
+  --color-track: var(--tt-track);
+  --color-nav-idle: var(--tt-nav-idle);
 
-  /* Utility shadow-card / shadow-raised */
+  /* Nomi semantici usati dalle pagine fuori dalla stanza (Home, Crew,
+     Profilo, Join): restano, ma puntano alla stessa palette. */
+  --color-accent: var(--tt-brand-button);
+  --color-on-accent: #ffffff;
+  --color-accent-soft: var(--tt-brand-soft);
+  --color-ok: var(--tt-brand-text);
+  --color-ok-soft: var(--tt-brand-soft);
+  --color-warn: var(--tt-warning-text);
+  --color-warn-soft: var(--tt-warning-soft);
+  --color-info: var(--tt-blue);
+  --color-info-soft: var(--tt-blue-soft);
+  --color-muted-soft: var(--tt-grey-soft);
+  --color-highlight-from: var(--tt-surface);
+  --color-highlight-to: var(--tt-brand-tint);
+
   --shadow-card: var(--tt-shadow-card);
+  --shadow-hero: var(--tt-shadow-hero);
   --shadow-raised: var(--tt-shadow-raised);
+  --shadow-float: var(--tt-shadow-float);
+  --shadow-cta: var(--tt-shadow-cta);
 
-  /* Gradiente della card evidenziata. */
-  --color-highlight-from: var(--tt-highlight-from);
-  --color-highlight-to: var(--tt-highlight-to);
+  --radius-card: 12px;
+  --radius-hero: 14px;
 }
 
-/* ── Tema chiaro (default) ───────────────────────────────────────────────
-   `data-theme` è sempre valorizzato da lib/theme.ts (lo script inline in
-   index.html lo imposta prima del primo paint), anche quando la preferenza
-   è "system": è il JS a risolverla. Così i valori del tema scuro esistono
-   in un solo blocco invece di essere ripetuti anche in una media query.
-
-   I valori di accento e semantici superano 4.5:1 sul bianco, così restano
-   leggibili a 12-13px: un verde più brillante passerebbe solo sui titoli. */
 :root {
   color-scheme: light;
-
-  --tt-canvas: #f3f5f8;
+  --tt-app-bg: #f8fafc;
   --tt-surface: #ffffff;
-  --tt-overlay: #ffffff;
-  --tt-fg: #0f2035;
-  --tt-fg-muted: #5c6b7f;
-  --tt-line: rgb(15 32 53 / 8%);
-  --tt-line-strong: rgb(15 32 53 / 14%);
-  --tt-line-dashed: #c2cddb;
-  --tt-highlight-from: #ffffff;
-  --tt-highlight-to: #eef7f3;
+  --tt-text: #101a3a;
+  --tt-text-secondary: #65738f;
+  --tt-text-soft: #5b6785;
+  --tt-line: rgb(16 26 58 / 5%);
+  --tt-line-strong: rgb(16 26 58 / 8%);
+  --tt-line-dashed: #b4bdce;
+  --tt-divider: #eaeef3;
 
-  --tt-accent: #0d9268;
-  --tt-on-accent: #ffffff;
-  --tt-accent-soft: rgb(13 146 104 / 12%);
-  --tt-ok: #0d9268;
-  --tt-warn: #b45309;
-  --tt-danger: #d92d20;
-  --tt-info: #1d64d8;
+  --tt-brand: #00bf78;
+  --tt-brand-button: #00a468;
+  --tt-brand-button-top: #00b26f;
+  --tt-brand-text: #078457;
+  --tt-brand-soft: #e4f7ee;
+  --tt-brand-tint: #e7f6ef;
 
-  /* Nel chiaro l'ombra sostituisce il bordo come separatore principale;
-     nello scuro è invisibile e il bordo fa tutto il lavoro. */
-  --tt-shadow-card: 0 1px 2px rgb(15 32 53 / 4%), 0 10px 24px -14px rgb(15 32 53 / 14%);
-  --tt-shadow-raised: 0 2px 6px rgb(15 32 53 / 6%), 0 16px 32px -16px rgb(15 32 53 / 18%);
-}
+  --tt-blue: #1473e6;
+  --tt-blue-soft: #e8f1fd;
+  --tt-purple: #6d4ae8;
+  --tt-purple-soft: #efebfd;
+  --tt-warning: #f08a0b;
+  --tt-warning-text: #b56a00;
+  --tt-warning-soft: #fff1dc;
+  --tt-note-soft: #fff8ea;
+  --tt-danger: #e5484d;
+  --tt-danger-text: #c62f3a;
+  --tt-danger-soft: #fdecec;
+  --tt-grey-soft: #eef2f6;
+  --tt-track: #e3e8ef;
+  --tt-nav-idle: #6b7a99;
 
-/* ── Tema scuro: la palette "obsidian" originale, invariata ───────────── */
-:root[data-theme="dark"] {
-  color-scheme: dark;
+  --tt-shadow-card: 0 1px 2px rgb(16 26 58 / 4%), 0 4px 14px rgb(16 26 58 / 5%);
+  --tt-shadow-hero: 0 1px 2px rgb(16 26 58 / 5%), 0 6px 18px rgb(16 26 58 / 8%);
+  --tt-shadow-raised: 0 2px 6px rgb(16 26 58 / 6%), 0 16px 32px -16px rgb(16 26 58 / 18%);
+  --tt-shadow-float: 0 1px 5px rgb(16 26 58 / 12%);
+  --tt-shadow-cta: 0 3px 10px rgb(0 164 104 / 32%);
 
-  --tt-canvas: #0a0a0f;
-  --tt-surface: #1a1a25;
-  --tt-overlay: #111118;
-  --tt-fg: #c9c9e0;
-  --tt-fg-muted: #9999b5;
-  --tt-line: rgb(100 100 180 / 10%);
-  --tt-line-strong: rgb(100 100 180 / 20%);
-  --tt-line-dashed: #4a4a6a;
-  --tt-highlight-from: #1a1a25;
-  --tt-highlight-to: #111118;
-
-  --tt-accent: #46d9c9;
-  --tt-on-accent: #0a0a0f;
-  --tt-accent-soft: rgb(70 217 201 / 15%);
-  --tt-ok: #46d9c9;
-  --tt-warn: #e8a33d;
-  --tt-danger: #e76f51;
-  --tt-info: #7aa2f7;
-
-  --tt-shadow-card: none;
-  --tt-shadow-raised: 0 12px 32px -12px rgb(0 0 0 / 55%);
+  /* Misure della shell, condivise da header, pager e barra di navigazione. */
+  --tt-nav-h: 55px;
+  --tt-header-h: 49px;
+  --tt-page-x: 10px;
 }
 
 body {
   margin: 0;
   min-height: 100svh;
-  background: var(--tt-canvas);
-  color: var(--tt-fg);
+  background: var(--tt-app-bg);
+  color: var(--tt-text);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -125,18 +138,57 @@ body {
 
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--tt-accent);
-    outline-offset: 4px;
+    outline: 2px solid var(--tt-brand-button);
+    outline-offset: 2px;
   }
   button, a, summary { -webkit-tap-highlight-color: transparent; }
   button:not(:disabled), summary { cursor: pointer; }
   input, select, textarea { font-size: 16px; }
 }
 
-.sheet { padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); }
-.sheet::backdrop { background: rgb(0 0 0 / 45%); backdrop-filter: blur(5px); }
+.sheet {
+  padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+  animation: sheet-up 240ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.sheet::backdrop {
+  background: rgb(16 26 58 / 38%);
+  backdrop-filter: blur(3px);
+  animation: fade-in 200ms ease-out;
+}
 .bottom-actions { padding-bottom: max(1rem, env(safe-area-inset-bottom)); }
 .page-content { padding-bottom: calc(7rem + env(safe-area-inset-bottom)); }
+
+/* Pagina di una tab: scorre per conto suo sotto header e barra, con spazio
+   per la barra traslucida e per l'home indicator. */
+.tab-page {
+  padding: 6px var(--tt-page-x) calc(var(--tt-nav-h) + env(safe-area-inset-bottom) + 14px);
+}
+
+/* Card e bottoni: pressione breve e nativa. */
+.press {
+  transition: transform 120ms ease-out;
+}
+.press:active {
+  transform: scale(0.985);
+}
+.press-btn:active {
+  transform: scale(0.98);
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes check-pop {
+  0% { transform: scale(0.6); }
+  60% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+.check-pop { animation: check-pop 180ms ease-out; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -147,51 +199,26 @@ body {
   }
 }
 
-/* I titoli usano ancora l'utility .font-serif ma ora rendono in Roboto:
-   li distinguiamo con peso e tracking più stretto invece che con un family serif. */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+}
 .font-serif {
   font-weight: 700;
   letter-spacing: -0.015em;
 }
+.font-hand {
+  font-family: var(--font-hand);
+}
 
 @keyframes fade-slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fade-slide-down {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-
-@keyframes radar-sweep {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 @keyframes radar-ping {
-  0% {
-    transform: scale(0.9);
-    opacity: 0.6;
-  }
-  100% {
-    transform: scale(1.4);
-    opacity: 0;
-  }
+  0% { transform: scale(0.9); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
 }

@@ -2,9 +2,7 @@ import { Check } from 'lucide-react'
 import { useState } from 'react'
 import BottomSheet from '../ui/BottomSheet'
 import Chip from '../ui/Chip'
-import { useRoomOptimistic } from '../../hooks/useRoomOptimistic'
-import { mutate } from '../../lib/db'
-import { resolveDelayReportsForCar, setCarTravelStatus } from '../../lib/mutations'
+import { useSetTravelStatus } from '../../hooks/useSetTravelStatus'
 import { formatRelativeTime } from '../../lib/time'
 import type { Car, TravelStatus } from '../../types'
 
@@ -12,7 +10,7 @@ const STATUS_META: Record<TravelStatus, { label: string; tone: 'muted' | 'amber'
   non_partita: { label: 'Non partita', tone: 'muted' },
   in_partenza: { label: 'In partenza', tone: 'amber' },
   in_viaggio: { label: 'In viaggio', tone: 'teal' },
-  fermo: { label: 'Fermo', tone: 'alert' },
+  fermo: { label: 'Ferma', tone: 'alert' },
   arrivata: { label: 'Arrivata', tone: 'teal' },
 }
 
@@ -24,62 +22,61 @@ interface TravelStatusChipProps {
   canEdit: boolean
 }
 
+interface TravelStatusSheetProps {
+  car: Car
+  currentMemberId: string
+  open: boolean
+  onClose: () => void
+}
+
+export function TravelStatusSheet({ car, currentMemberId, open, onClose }: TravelStatusSheetProps) {
+  const setStatus = useSetTravelStatus(car.room_id, currentMemberId)
+  return (
+    <BottomSheet open={open} onClose={onClose} title="Aggiorna stato viaggio">
+      <div className="space-y-2">
+        {SELECTABLE.map((status) => {
+          const optionMeta = STATUS_META[status]
+          const current = car.travel_status === status
+          return (
+            <button
+              key={status}
+              type="button"
+              aria-pressed={current}
+              onClick={() => {
+                onClose()
+                setStatus(car, status)
+              }}
+              className={`press flex min-h-12 w-full items-center justify-between rounded-card border px-4 ${
+                current ? 'border-brand bg-brand-soft' : 'border-line bg-surface shadow-card'
+              }`}
+            >
+              <p className="text-[13px] font-semibold text-fg">{optionMeta.label}</p>
+              {current && <Check aria-hidden="true" size={16} className="text-brand-text" />}
+            </button>
+          )
+        })}
+      </div>
+    </BottomSheet>
+  )
+}
+
 export default function TravelStatusChip({ car, currentMemberId, canEdit }: TravelStatusChipProps) {
   const [open, setOpen] = useState(false)
-  const optimistic = useRoomOptimistic(car.room_id)
   const meta = STATUS_META[car.travel_status]
-
-  function setStatus(status: TravelStatus) {
-    const now = new Date().toISOString()
-    setOpen(false)
-    optimistic(
-      'cars.setTravelStatus',
-      (prev) => ({
-        ...prev,
-        cars: prev.cars.map((c) =>
-          c.id === car.id
-            ? { ...c, travel_status: status, travel_status_updated_at: now, travel_status_updated_by: currentMemberId }
-            : c,
-        ),
-      }),
-      () => setCarTravelStatus(car.id, status, currentMemberId, now),
-      'Stato viaggio non aggiornato.',
-    )
-
-    if (status === 'arrivata') {
-      mutate('delay_reports.resolveOnArrival', resolveDelayReportsForCar(car.id, now))
-    }
-  }
 
   return (
     <div className="flex flex-col items-end gap-0.5">
-      <button onClick={() => canEdit && setOpen(true)} disabled={!canEdit}>
+      <button type="button" onClick={() => canEdit && setOpen(true)} disabled={!canEdit} aria-label={`Stato viaggio: ${meta.label}${canEdit ? ', modifica' : ''}`}>
         <Chip tone={meta.tone}>
           {car.travel_status === 'arrivata' && <Check size={10} />}
           {meta.label}
         </Chip>
       </button>
-      <span className="font-mono text-[10px] text-fg-muted">
+      <span className="text-[10px] text-fg-muted">
         aggiornato {formatRelativeTime(car.travel_status_updated_at)}
       </span>
 
-      <BottomSheet open={open} onClose={() => setOpen(false)} title="Aggiorna stato viaggio">
-        <div className="space-y-2">
-          {SELECTABLE.map((status) => {
-            const optionMeta = STATUS_META[status]
-            return (
-              <button
-                key={status}
-                onClick={() => setStatus(status)}
-                className="flex w-full items-center justify-between rounded-2xl bg-canvas px-4 py-3.5 transition-transform active:scale-[0.98]"
-              >
-                <p className="text-[13px] font-medium text-fg">{optionMeta.label}</p>
-                <Chip tone={optionMeta.tone}>&nbsp;</Chip>
-              </button>
-            )
-          })}
-        </div>
-      </BottomSheet>
+      <TravelStatusSheet car={car} currentMemberId={currentMemberId} open={open} onClose={() => setOpen(false)} />
     </div>
   )
 }
